@@ -9,6 +9,7 @@ repository = "https://github.com/mariusgrote/eulumdat-core"
 [lints.rust]
 unsafe_code = "deny"
 missing_debug_implementations = "warn"
+missing_docs = "warn"
 unused_crate_dependencies = "warn"
 
 [lints.clippy]

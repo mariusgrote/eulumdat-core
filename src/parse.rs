@@ -69,10 +69,12 @@ impl<'a> LineReader<'a> {
 }
 
 impl Eulumdat {
+    /// Parses EULUMDAT text using unrestricted validation settings.
     pub fn parse(input: &str) -> Result<(Self, Vec<ValidationWarning>), EulumdatError> {
         Self::parse_with_settings(input, ValidationSettings::unrestricted())
     }
 
+    /// Parses EULUMDAT text using the supplied validation settings.
     pub fn parse_with_settings(
         input: &str,
         settings: ValidationSettings,
@@ -188,16 +190,19 @@ impl Eulumdat {
         Ok((loaded, warnings))
     }
 
+    /// Parses EULUMDAT bytes as UTF-8 or Windows-1252 using unrestricted settings.
     pub fn parse_bytes(input: &[u8]) -> Result<(Self, Vec<ValidationWarning>), EulumdatError> {
         Self::parse_bytes_with_settings(input, ValidationSettings::unrestricted())
     }
 
+    /// Parses EULUMDAT bytes and returns the detected text encoding.
     pub fn parse_bytes_detect_encoding(
         input: &[u8],
     ) -> Result<(Self, Vec<ValidationWarning>, TextEncoding), EulumdatError> {
         Self::parse_bytes_detect_encoding_with_settings(input, ValidationSettings::unrestricted())
     }
 
+    /// Parses EULUMDAT bytes using the supplied validation settings.
     pub fn parse_bytes_with_settings(
         input: &[u8],
         settings: ValidationSettings,
@@ -206,6 +211,7 @@ impl Eulumdat {
         Ok((ldt, warnings))
     }
 
+    /// Parses EULUMDAT bytes with settings and returns the detected text encoding.
     pub fn parse_bytes_detect_encoding_with_settings(
         input: &[u8],
         settings: ValidationSettings,
@@ -215,6 +221,7 @@ impl Eulumdat {
         Ok((ldt, warnings, encoding))
     }
 
+    /// Reads and parses an EULUMDAT file from a path.
     pub fn from_path(
         path: impl AsRef<Path>,
     ) -> Result<(Self, Vec<ValidationWarning>), EulumdatError> {

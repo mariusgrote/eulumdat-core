@@ -1,6 +1,7 @@
 use crate::{Distribution, Eulumdat, EulumdatError};
 
 impl Eulumdat {
+    /// Resamples gamma angles to a regular step using cubic spline interpolation.
     pub fn resample_gamma(&mut self, new_step_degrees: u32) -> Result<(), EulumdatError> {
         if !(1..=180).contains(&new_step_degrees) {
             return Err(EulumdatError::Validation(
@@ -53,6 +54,7 @@ impl Eulumdat {
         })
     }
 
+    /// Scales intensities so calculated total output is 100%.
     pub fn scale_to_100_percent(&mut self) {
         let current_output = self.total_output();
         if current_output <= 0.0 {
@@ -67,6 +69,7 @@ impl Eulumdat {
         self.light_output_ratio = 100.0;
     }
 
+    /// Scales intensities to 100% and adjusts lamp flux to preserve total output.
     pub fn scale_to_100_percent_with_flux(&mut self) {
         let current_output = self.total_output();
         if current_output <= 0.0 {

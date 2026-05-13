@@ -5,16 +5,19 @@ use crate::{Eulumdat, EulumdatError, TypeIndicator, ValidationSettings};
 
 impl Eulumdat {
     #[must_use]
+    /// Serializes the model to EULUMDAT text.
     pub fn to_text(&self) -> String {
         self.to_text_checked()
             .expect("valid Eulumdat shape is required for serialization")
     }
 
     #[must_use]
+    /// Serializes the model to UTF-8 EULUMDAT bytes.
     pub fn to_bytes(&self) -> Vec<u8> {
         self.to_text().into_bytes()
     }
 
+    /// Validates and writes the model as EULUMDAT text to a path.
     pub fn write_path(&self, path: impl AsRef<Path>) -> Result<(), EulumdatError> {
         self.validate(ValidationSettings::unrestricted())?;
         std::fs::write(path, self.to_text_checked()?)?;

@@ -4,11 +4,13 @@ use crate::{Eulumdat, Symmetry};
 
 impl Eulumdat {
     #[must_use]
+    /// Calculates total luminous output from the stored intensity distribution.
     pub fn total_output(&self) -> f64 {
         self.weighted_plane_sum(Self::output_for_plane)
     }
 
     #[must_use]
+    /// Calculates the downward flux fraction from the stored intensity distribution.
     pub fn calculated_downward_flux_fraction(&self) -> f64 {
         let output = self.total_output();
         if output <= 0.0 {
@@ -18,21 +20,25 @@ impl Eulumdat {
     }
 
     #[must_use]
+    /// Calculates the 50% beam angle across the C0/C180 plane pair.
     pub fn beam_angle_c0_c180(&self) -> Option<f64> {
         self.angle_for_plane(0.0, 180.0, 0.5)
     }
 
     #[must_use]
+    /// Calculates the 50% beam angle across the C90/C270 plane pair.
     pub fn beam_angle_c90_c270(&self) -> Option<f64> {
         self.angle_for_plane(90.0, 270.0, 0.5)
     }
 
     #[must_use]
+    /// Calculates the 10% field angle across the C0/C180 plane pair.
     pub fn field_angle_c0_c180(&self) -> Option<f64> {
         self.angle_for_plane(0.0, 180.0, 0.1)
     }
 
     #[must_use]
+    /// Calculates the 10% field angle across the C90/C270 plane pair.
     pub fn field_angle_c90_c270(&self) -> Option<f64> {
         self.angle_for_plane(90.0, 270.0, 0.1)
     }

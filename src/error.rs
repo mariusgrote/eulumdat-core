@@ -1,26 +1,41 @@
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
+/// Error type returned by EULUMDAT parsing, validation, and serialization APIs.
 pub enum EulumdatError {
+    /// An I/O operation failed.
     Io(std::io::Error),
+    /// Strict UTF-8 decoding failed.
     Utf8(std::str::Utf8Error),
+    /// A field could not be parsed from text.
     Parse(ParseContext),
+    /// A parsed or edited model violates EULUMDAT validation rules.
     Validation(String),
+    /// The C-plane, gamma-angle, or intensity matrix dimensions are inconsistent.
     DistributionShape(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Location and field information for a parse error.
 pub struct ParseContext {
+    /// The EULUMDAT field being read when the error occurred.
     pub field: String,
+    /// The one-based input line number.
     pub line_number: usize,
+    /// The byte offset at the start of the failed field.
     pub byte_offset: usize,
+    /// The original line text, when a line was available.
     pub raw_line: Option<String>,
+    /// A short machine-readable reason for the parse failure.
     pub reason: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Non-fatal validation issue found in a parsed or edited model.
 pub struct ValidationWarning {
+    /// The field that triggered the warning.
     pub field: String,
+    /// Human-readable warning message.
     pub message: String,
 }
 

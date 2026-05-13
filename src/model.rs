@@ -1,70 +1,128 @@
 use crate::EulumdatError;
 
 #[derive(Debug, Clone, PartialEq)]
+/// Parsed EULUMDAT luminaire data.
+///
+/// Field names follow the EULUMDAT record layout. Numeric lengths are in
+/// millimeters, angular values are in degrees, flux fractions and output ratios
+/// are percentages, and luminous intensities are candela per kilolumen values as
+/// stored in the file.
 pub struct Eulumdat {
+    /// Free-form file identification line.
     pub identification: String,
+    /// Luminaire type indicator.
     pub type_indicator: TypeIndicator,
+    /// Photometric distribution symmetry indicator.
     pub symmetry: Symmetry,
+    /// Declared angular step between C-planes, in degrees.
     pub c_plane_step: f64,
+    /// Declared angular step between gamma angles, in degrees.
     pub gamma_step: f64,
+    /// Measurement report number.
     pub measurement_report_number: String,
+    /// Luminaire name.
     pub luminaire_name: String,
+    /// Luminaire number or catalogue identifier.
     pub luminaire_number: String,
+    /// Source file name recorded in the EULUMDAT data.
     pub file_name: String,
+    /// Date and user field from the EULUMDAT file.
     pub date_user: String,
+    /// Length or diameter of the luminaire.
     pub luminaire_length: f64,
+    /// Width of the luminaire.
     pub luminaire_width: f64,
+    /// Height of the luminaire.
     pub luminaire_height: f64,
+    /// Length or diameter of the luminous area.
     pub luminous_area_length: f64,
+    /// Width of the luminous area.
     pub luminous_area_width: f64,
+    /// Height of the luminous area in the C0 plane.
     pub luminous_area_height_c0: f64,
+    /// Height of the luminous area in the C90 plane.
     pub luminous_area_height_c90: f64,
+    /// Height of the luminous area in the C180 plane.
     pub luminous_area_height_c180: f64,
+    /// Height of the luminous area in the C270 plane.
     pub luminous_area_height_c270: f64,
+    /// Downward flux fraction recorded in the file, as a percentage.
     pub downward_flux_fraction: f64,
+    /// Light output ratio recorded in the file, as a percentage.
     pub light_output_ratio: f64,
+    /// Conversion factor for luminous intensities.
     pub conversion_factor: f64,
+    /// Luminaire tilt during measurement, in degrees.
     pub tilt: f64,
+    /// Lamp sets described by the file.
     pub lamps: Vec<LampSet>,
+    /// Direct-ratio values `k1` through `k10`.
     pub direct_ratios: [f64; 10],
+    /// Expanded C-plane angles, in degrees.
     pub c_planes: Vec<f64>,
+    /// Gamma angles, in degrees.
     pub gamma_angles: Vec<f64>,
+    /// Stored luminous intensity rows indexed by C-plane, then gamma angle.
     pub intensities: Vec<Vec<f64>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// One standard set of lamps described by an EULUMDAT file.
 pub struct LampSet {
+    /// Number of lamps in the set.
     pub lamp_count: u32,
+    /// Lamp type description.
     pub lamp_type: String,
+    /// Total luminous flux of the lamps in lumens.
     pub total_luminous_flux: f64,
+    /// Lamp color temperature description.
     pub color_temperature: String,
+    /// Lamp color rendering index description.
     pub color_rendering_index: String,
+    /// Lamp wattage including ballast.
     pub wattage_including_ballast: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// EULUMDAT symmetry indicator for the luminous intensity distribution.
 pub enum Symmetry {
+    /// No symmetry; all declared C-plane rows are stored.
     None,
+    /// Rotational symmetry; one C-plane row is stored.
     Rotational,
+    /// Symmetry between the C0 and C180 planes.
     C0C180,
+    /// Symmetry between the C90 and C270 planes.
     C90C270,
+    /// Symmetry across both C0/C180 and C90/C270 axes.
     C0C180AndC90C270,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// EULUMDAT type indicator.
 pub enum TypeIndicator {
+    /// Point source with symmetry, serialized as raw value `1`.
     PointSourceWithSymmetry,
+    /// Linear luminaire, serialized as raw value `2`.
     LinearLuminaire,
+    /// Point source without symmetry, serialized as raw value `3`.
     PointSourceWithoutSymmetry,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Replacement photometric distribution for an [`Eulumdat`] model.
 pub struct Distribution {
+    /// Symmetry of the replacement distribution.
     pub symmetry: Symmetry,
+    /// Angular step between C-planes, in degrees.
     pub c_plane_step: f64,
+    /// Angular step between gamma angles, in degrees.
     pub gamma_step: f64,
+    /// Expanded C-plane angles, in degrees.
     pub c_planes: Vec<f64>,
+    /// Gamma angles, in degrees.
     pub gamma_angles: Vec<f64>,
+    /// Stored luminous intensity rows indexed by C-plane, then gamma angle.
     pub intensities: Vec<Vec<f64>>,
 }
 
@@ -75,10 +133,15 @@ pub struct Distribution {
 /// luminaire number, and date/user.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ValidationSettings {
+    /// Maximum length for identification and other general text fields.
     pub max_identification_len: Option<usize>,
+    /// Maximum length for the file name field.
     pub max_file_name_len: Option<usize>,
+    /// Maximum length for each lamp type field.
     pub max_lamp_type_len: Option<usize>,
+    /// Maximum length for each color temperature field.
     pub max_color_temperature_len: Option<usize>,
+    /// Maximum length for each color rendering index field.
     pub max_color_rendering_index_len: Option<usize>,
 }
 
@@ -119,19 +182,23 @@ impl Default for Eulumdat {
 
 impl Eulumdat {
     #[must_use]
+    /// Returns the number of expanded C-plane angles.
     pub fn c_plane_count(&self) -> usize {
         self.c_planes.len()
     }
 
     #[must_use]
+    /// Returns the number of gamma angles in each intensity row.
     pub fn gamma_count(&self) -> usize {
         self.gamma_angles.len()
     }
 
+    /// Returns the number of C-plane rows stored for the current symmetry.
     pub fn stored_c_plane_count(&self) -> Result<usize, EulumdatError> {
         self.symmetry.stored_c_plane_count(self.c_plane_count())
     }
 
+    /// Replaces the photometric distribution after validating its matrix shape.
     pub fn replace_distribution(
         &mut self,
         distribution: Distribution,
@@ -189,6 +256,7 @@ pub(crate) fn validate_distribution_shape(
 }
 
 impl Symmetry {
+    /// Converts a raw EULUMDAT symmetry indicator into a typed value.
     pub fn from_raw(value: u8) -> Result<Self, EulumdatError> {
         match value {
             0 => Ok(Self::None),
@@ -203,6 +271,7 @@ impl Symmetry {
     }
 
     #[must_use]
+    /// Returns the raw EULUMDAT symmetry indicator value.
     pub fn raw_value(self) -> u8 {
         match self {
             Self::None => 0,
@@ -213,6 +282,7 @@ impl Symmetry {
         }
     }
 
+    /// Returns the number of intensity rows stored for this symmetry.
     pub fn stored_c_plane_count(
         self,
         declared_c_plane_count: usize,
@@ -227,6 +297,7 @@ impl Symmetry {
 }
 
 impl TypeIndicator {
+    /// Converts a raw EULUMDAT type indicator into a typed value.
     pub fn from_raw(value: u8) -> Result<Self, EulumdatError> {
         match value {
             1 => Ok(Self::PointSourceWithSymmetry),
@@ -239,6 +310,7 @@ impl TypeIndicator {
     }
 
     #[must_use]
+    /// Returns the raw EULUMDAT type indicator value.
     pub fn raw_value(self) -> u8 {
         match self {
             Self::PointSourceWithSymmetry => 1,
@@ -250,6 +322,7 @@ impl TypeIndicator {
 
 impl ValidationSettings {
     #[must_use]
+    /// Returns settings that do not enforce text length limits.
     pub const fn unrestricted() -> Self {
         Self {
             max_identification_len: None,
@@ -261,6 +334,7 @@ impl ValidationSettings {
     }
 
     #[must_use]
+    /// Returns the legacy EULUMDAT text length limits used by strict tools.
     pub const fn restricted() -> Self {
         Self {
             max_identification_len: Some(78),

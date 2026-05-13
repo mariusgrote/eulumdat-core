@@ -4,6 +4,7 @@ use crate::{
 };
 
 impl Eulumdat {
+    /// Validates structural constraints and returns non-fatal warnings.
     pub fn validate(
         &self,
         settings: ValidationSettings,

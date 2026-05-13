@@ -1,27 +1,37 @@
 use crate::{EulumdatError, Symmetry};
 
 #[derive(Debug, Clone, PartialEq)]
+/// Photometric distribution parsed from a tab-separated intensity table.
 pub struct TableDistribution {
+    /// Inferred symmetry of the table.
     pub symmetry: Symmetry,
+    /// Inferred angular step between C-planes, in degrees.
     pub c_plane_step: f64,
+    /// Inferred angular step between gamma angles, in degrees.
     pub gamma_step: f64,
+    /// Expanded C-plane angles, in degrees.
     pub c_planes: Vec<f64>,
+    /// Gamma angles, in degrees.
     pub gamma_angles: Vec<f64>,
+    /// Stored luminous intensity rows indexed by C-plane, then gamma angle.
     pub intensities: Vec<Vec<f64>>,
 }
 
 impl TableDistribution {
     #[must_use]
+    /// Returns the number of expanded C-plane angles.
     pub fn c_plane_count(&self) -> usize {
         self.c_planes.len()
     }
 
     #[must_use]
+    /// Returns the number of gamma angles in each intensity row.
     pub fn gamma_count(&self) -> usize {
         self.gamma_angles.len()
     }
 }
 
+/// Parses a tab-separated intensity table into a photometric distribution.
 pub fn parse_table_text(input: &str) -> Result<TableDistribution, EulumdatError> {
     let rows: Vec<Vec<&str>> = input
         .lines()

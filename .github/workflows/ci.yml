@@ -1,0 +1,41 @@
+name: CI
+
+# Only give read permissions to repository
+permissions:
+  contents: read
+
+# Run on PRs and on merge to master
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+# Cancel run if PR is updated concurrently
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-lint:
+    name: Format, Build, Test, Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Build
+        run: cargo build --workspace --all-targets --verbose
+
+      - name: Test
+        run: cargo test --workspace --all-targets --verbose
+
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings

@@ -85,6 +85,7 @@
     clippy::similar_names
 )]
 
+mod encoding;
 mod error;
 mod model;
 mod parse;
@@ -94,6 +95,7 @@ mod serialize;
 mod table_parser;
 mod validation;
 
+pub use crate::encoding::TextEncoding;
 pub use crate::error::{EulumdatError, ParseContext, ValidationWarning};
 pub use crate::model::{
     Distribution, Eulumdat, LampSet, Symmetry, TypeIndicator, ValidationSettings,

@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use crate::{
-    Eulumdat, EulumdatError, LampSet, ParseContext, Symmetry, TypeIndicator, ValidationSettings,
-    ValidationWarning,
+    Eulumdat, EulumdatError, LampSet, ParseContext, Symmetry, TextEncoding, TypeIndicator,
+    ValidationSettings, ValidationWarning, encoding::decode_ldt_bytes,
 };
 
 struct LineReader<'a> {
@@ -192,12 +192,27 @@ impl Eulumdat {
         Self::parse_bytes_with_settings(input, ValidationSettings::unrestricted())
     }
 
+    pub fn parse_bytes_detect_encoding(
+        input: &[u8],
+    ) -> Result<(Self, Vec<ValidationWarning>, TextEncoding), EulumdatError> {
+        Self::parse_bytes_detect_encoding_with_settings(input, ValidationSettings::unrestricted())
+    }
+
     pub fn parse_bytes_with_settings(
         input: &[u8],
         settings: ValidationSettings,
     ) -> Result<(Self, Vec<ValidationWarning>), EulumdatError> {
-        let text = std::str::from_utf8(input)?;
-        Self::parse_with_settings(text, settings)
+        let (ldt, warnings, _) = Self::parse_bytes_detect_encoding_with_settings(input, settings)?;
+        Ok((ldt, warnings))
+    }
+
+    pub fn parse_bytes_detect_encoding_with_settings(
+        input: &[u8],
+        settings: ValidationSettings,
+    ) -> Result<(Self, Vec<ValidationWarning>, TextEncoding), EulumdatError> {
+        let (text, encoding) = decode_ldt_bytes(input);
+        let (ldt, warnings) = Self::parse_with_settings(&text, settings)?;
+        Ok((ldt, warnings, encoding))
     }
 
     pub fn from_path(

@@ -15,8 +15,7 @@ installer, or Qt application integration is included.
 use eulumdat_core::Eulumdat;
 
 fn main() -> Result<(), eulumdat_core::EulumdatError> {
-    let text = std::fs::read_to_string("luminaire.ldt")?;
-    let (mut ldt, warnings) = Eulumdat::parse(&text)?;
+    let (mut ldt, warnings) = Eulumdat::from_path("luminaire.ldt")?;
     println!("warnings: {}", warnings.len());
     println!("total output: {}", ldt.total_output());
     println!("beam C0-C180: {:?}", ldt.beam_angle_c0_c180());
@@ -29,6 +28,11 @@ fn main() -> Result<(), eulumdat_core::EulumdatError> {
 
 Most model fields are public for inspection and editing. Manual mutation can
 create invalid states; call `validate()` before serializing modified data.
+
+`.ldt` files are commonly UTF-8, Windows-1252, or Latin-1-like text. Byte and
+file APIs decode UTF-8 first and fall back to Windows-1252 for legacy files.
+String APIs such as `Eulumdat::parse` assume the caller has already decoded the
+text.
 
 ## Provenance
 

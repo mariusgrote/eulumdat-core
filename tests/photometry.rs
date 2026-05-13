@@ -1,4 +1,5 @@
 #![allow(clippy::pedantic)]
+#![allow(unused_crate_dependencies)]
 mod common;
 
 use std::f64::consts::PI;

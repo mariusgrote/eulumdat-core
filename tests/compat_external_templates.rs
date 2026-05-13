@@ -1,4 +1,5 @@
 #![allow(clippy::pedantic)]
+#![allow(unused_crate_dependencies)]
 
 use eulumdat_core::Eulumdat;
 

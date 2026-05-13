@@ -1,4 +1,5 @@
 #![allow(clippy::pedantic)]
+#![allow(unused_crate_dependencies)]
 mod common;
 
 use eulumdat_core::{Symmetry, TypeIndicator};

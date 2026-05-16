@@ -13,6 +13,8 @@ pub enum EulumdatError {
     Validation(String),
     /// The C-plane, gamma-angle, or intensity matrix dimensions are inconsistent.
     DistributionShape(String),
+    /// Artifact generation failed.
+    Generation(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -47,6 +49,7 @@ impl Display for EulumdatError {
             Self::Parse(context) => write!(f, "{context}"),
             Self::Validation(message) => write!(f, "validation error: {message}"),
             Self::DistributionShape(message) => write!(f, "distribution shape error: {message}"),
+            Self::Generation(message) => write!(f, "generation error: {message}"),
         }
     }
 }
@@ -70,7 +73,10 @@ impl std::error::Error for EulumdatError {
         match self {
             Self::Io(error) => Some(error),
             Self::Utf8(error) => Some(error),
-            Self::Parse(_) | Self::Validation(_) | Self::DistributionShape(_) => None,
+            Self::Parse(_)
+            | Self::Validation(_)
+            | Self::DistributionShape(_)
+            | Self::Generation(_) => None,
         }
     }
 }

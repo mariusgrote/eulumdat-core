@@ -123,7 +123,7 @@ impl Eulumdat {
         sum / 10.0
     }
 
-    fn intensity_profile_for_c_plane(&self, c_plane: f64) -> Option<&[f64]> {
+    pub(crate) fn intensity_profile_for_c_plane(&self, c_plane: f64) -> Option<&[f64]> {
         if self.intensities.is_empty() || self.gamma_angles.is_empty() {
             return None;
         }

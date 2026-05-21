@@ -1,5 +1,7 @@
 //! Generation helpers for photometric diagrams and reports.
 
+#[cfg(any(feature = "generate-pdf", feature = "generate-png"))]
+mod fonts;
 #[cfg(feature = "generate-pdf")]
 mod pdf;
 #[cfg(feature = "generate-png")]

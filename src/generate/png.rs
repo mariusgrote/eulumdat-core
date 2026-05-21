@@ -1,6 +1,7 @@
 use tiny_skia::{Color, Pixmap, Transform};
 use usvg::{Options, Tree};
 
+use crate::generate::fonts::{DEJAVU_SANS_BOLD, DEJAVU_SANS_REGULAR};
 use crate::generate::polar_svg::PolarDiagramOptions;
 use crate::{Eulumdat, EulumdatError};
 
@@ -42,7 +43,14 @@ impl Eulumdat {
         raster: &RasterOptions,
     ) -> Result<Vec<u8>, EulumdatError> {
         let svg = self.to_polar_svg(polar)?;
-        let tree = Tree::from_str(&svg, &Options::default()).map_err(|error| {
+        let mut svg_options = Options::default();
+        {
+            let db = svg_options.fontdb_mut();
+            db.load_font_data(DEJAVU_SANS_REGULAR.to_vec());
+            db.load_font_data(DEJAVU_SANS_BOLD.to_vec());
+            db.set_sans_serif_family("DejaVu Sans");
+        }
+        let tree = Tree::from_str(&svg, &svg_options).map_err(|error| {
             EulumdatError::Generation(format!("failed to parse generated SVG: {error}"))
         })?;
         let mut pixmap = Pixmap::new(raster.width, raster.height)

@@ -3,7 +3,7 @@
 #![allow(unused_crate_dependencies)]
 mod common;
 
-use eulumdat_core::{Distribution, Symmetry, TypeIndicator, ValidationSettings};
+use eulumdat_core::{Distribution, LampSet, Symmetry, TypeIndicator, ValidationSettings};
 
 #[test]
 fn validation_detects_distribution_shape_mismatch() {
@@ -58,6 +58,59 @@ fn validation_uses_explicit_settings() {
             .any(|warning| warning.field == "Identification"
                 && warning.message.contains("line is too long"))
     );
+}
+
+#[test]
+fn lamp_warnings_carry_their_set_index() {
+    let mut ldt = common::synthetic_model(Symmetry::C0C180, TypeIndicator::PointSourceWithSymmetry);
+    // Two lamp sets; only the second has an out-of-range lamp count.
+    let mut second = ldt.lamps[0].clone();
+    second.lamp_count = 0;
+    ldt.lamps.push(second);
+    // A document-level field that should report no lamp index.
+    ldt.luminaire_width = 99_999.0;
+
+    let warnings = ldt
+        .validate(ValidationSettings::unrestricted())
+        .expect("validation");
+
+    let lamp_warning = warnings
+        .iter()
+        .find(|w| w.field == "Number of lamps")
+        .expect("lamp count warning");
+    assert_eq!(lamp_warning.lamp_index, Some(1));
+
+    let doc_warning = warnings
+        .iter()
+        .find(|w| w.field == "Width of luminaire")
+        .expect("width warning");
+    assert_eq!(doc_warning.lamp_index, None);
+}
+
+#[test]
+fn duplicate_lamp_warnings_map_to_successive_sets() {
+    let mut ldt = common::synthetic_model(Symmetry::C0C180, TypeIndicator::PointSourceWithSymmetry);
+    ldt.lamps = vec![
+        LampSet {
+            lamp_count: 0,
+            ..ldt.lamps[0].clone()
+        },
+        LampSet {
+            lamp_count: 0,
+            ..ldt.lamps[0].clone()
+        },
+    ];
+
+    let warnings = ldt
+        .validate(ValidationSettings::unrestricted())
+        .expect("validation");
+
+    let indices: Vec<_> = warnings
+        .iter()
+        .filter(|w| w.field == "Number of lamps")
+        .map(|w| w.lamp_index)
+        .collect();
+    assert_eq!(indices, vec![Some(0), Some(1)]);
 }
 
 #[test]

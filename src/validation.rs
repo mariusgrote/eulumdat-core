@@ -178,7 +178,12 @@ impl Eulumdat {
             180.0,
         );
 
-        for lamp in &self.lamps {
+        for (lamp_index, lamp) in self.lamps.iter().enumerate() {
+            // All checks in this loop body push document-level warnings (lamp_index
+            // = None). Record where this set's warnings start so we can stamp them
+            // with their lamp index afterwards, keeping the helpers index-agnostic.
+            let lamp_warnings_start = warnings.len();
+
             if !(1..=1000).contains(&lamp.lamp_count) {
                 warnings.push(warning(
                     "Number of lamps",
@@ -220,6 +225,10 @@ impl Eulumdat {
                 0.1,
                 10_000.0,
             );
+
+            for warning in &mut warnings[lamp_warnings_start..] {
+                warning.lamp_index = Some(lamp_index);
+            }
         }
 
         for (index, value) in self.direct_ratios.iter().enumerate() {
@@ -336,6 +345,7 @@ fn warning(field: impl Into<String>, message: String) -> ValidationWarning {
     ValidationWarning {
         field: field.into(),
         message,
+        lamp_index: None,
     }
 }
 

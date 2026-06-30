@@ -39,6 +39,13 @@ pub struct ValidationWarning {
     pub field: String,
     /// Human-readable warning message.
     pub message: String,
+    /// Zero-based index of the lamp set this warning refers to, when the field
+    /// belongs to a repeated lamp set; `None` for document-level fields.
+    ///
+    /// Several lamp sets share the same `field` label (e.g. "Number of lamps"),
+    /// so consumers need this to attribute a warning to a specific set without
+    /// re-deriving the validation rules themselves.
+    pub lamp_index: Option<usize>,
 }
 
 impl Display for EulumdatError {

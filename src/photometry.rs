@@ -67,21 +67,15 @@ impl Eulumdat {
                 d / 360.0
             }
             Symmetry::C90C270 => {
-                let Some(mut j) = self.c_planes.iter().position(|value| *value == 90.0) else {
+                // Rows run from C270 over C0 to C90; offsets are measured from C270.
+                let offsets = self.c90_c270_row_offsets();
+                if offsets.len() < stored {
                     return 0.0;
-                };
-                j += 1;
+                }
                 for i in 1..stored {
-                    if j >= self.c_planes.len() {
-                        return 0.0;
-                    }
-                    d += 2.0 * (self.c_planes[j] - self.c_planes[j - 1]) * plane_fn(self, i - 1);
-                    j += 1;
+                    d += 2.0 * (offsets[i] - offsets[i - 1]) * plane_fn(self, i - 1);
                 }
-                if j == 0 || j > self.c_planes.len() {
-                    return 0.0;
-                }
-                d += 2.0 * (270.0 - self.c_planes[j - 1]) * plane_fn(self, stored - 1);
+                d += 2.0 * (180.0 - offsets[stored - 1]) * plane_fn(self, stored - 1);
                 d / 360.0
             }
             Symmetry::C0C180AndC90C270 => {
@@ -123,63 +117,16 @@ impl Eulumdat {
         sum / 10.0
     }
 
+    /// Returns the stored intensity profile for an extended C angle.
+    ///
+    /// See [`Eulumdat::stored_row_for_c_plane`] for the mapping from C angle to
+    /// stored row.
     pub(crate) fn intensity_profile_for_c_plane(&self, c_plane: f64) -> Option<&[f64]> {
-        if self.intensities.is_empty() || self.gamma_angles.is_empty() {
+        if self.gamma_angles.is_empty() {
             return None;
         }
-        let mut c = c_plane % 360.0;
-        if c < 0.0 {
-            c += 360.0;
-        }
-        let same = |a: f64, b: f64| {
-            let mut diff = (a - b) % 360.0;
-            if diff < -180.0 {
-                diff += 360.0;
-            } else if diff > 180.0 {
-                diff -= 360.0;
-            }
-            diff.abs() < 1e-6
-        };
-        let find_expanded = |effective: f64| -> Option<usize> {
-            self.c_planes
-                .iter()
-                .enumerate()
-                .find_map(|(index, value)| same(*value, effective).then_some(index))
-        };
-        let first_stored = |first: f64| find_expanded(first).unwrap_or(0);
-
-        let idx = match self.symmetry {
-            Symmetry::Rotational => Some(0),
-            Symmetry::None => find_expanded(c),
-            Symmetry::C0C180 => {
-                let effective = if c > 180.0 { 360.0 - c } else { c };
-                find_expanded(effective)
-            }
-            Symmetry::C90C270 => {
-                let effective = if c < 90.0 {
-                    180.0 - c
-                } else if c > 270.0 {
-                    540.0 - c
-                } else {
-                    c
-                };
-                find_expanded(effective)
-                    .and_then(|expanded| expanded.checked_sub(first_stored(90.0)))
-            }
-            Symmetry::C0C180AndC90C270 => {
-                let mut cc = c;
-                if cc > 180.0 {
-                    cc = 360.0 - cc;
-                }
-                if cc > 90.0 {
-                    cc = 180.0 - cc;
-                }
-                find_expanded(cc)
-            }
-        }?;
-
         self.intensities
-            .get(idx)
+            .get(self.stored_row_for_c_plane(c_plane)?)
             .filter(|row| row.len() == self.gamma_angles.len())
             .map(Vec::as_slice)
     }

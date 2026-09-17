@@ -1,5 +1,8 @@
 use crate::{EulumdatError, Symmetry};
 
+#[cfg(doc)]
+use crate::Eulumdat;
+
 #[derive(Debug, Clone, PartialEq)]
 /// Photometric distribution parsed from a tab-separated intensity table.
 pub struct TableDistribution {
@@ -14,6 +17,10 @@ pub struct TableDistribution {
     /// Gamma angles, in degrees.
     pub gamma_angles: Vec<f64>,
     /// Stored luminous intensity rows indexed by C-plane, then gamma angle.
+    ///
+    /// Rows follow the EULUMDAT order described at [`Eulumdat::intensities`];
+    /// for [`Symmetry::C90C270`] the table columns C90…C270 are stored in
+    /// reverse as C270…C0…C90.
     pub intensities: Vec<Vec<f64>>,
 }
 
@@ -85,6 +92,11 @@ pub fn parse_table_text(input: &str) -> Result<TableDistribution, EulumdatError>
 
     let gamma_step = regular_step(&gamma_values);
     let (symmetry, c_plane_step, expanded_c_planes) = infer_c_planes(&c_values)?;
+    if symmetry == Symmetry::C90C270 {
+        // The table covers C90…C270, whose mirror images at the C90–C270 plane
+        // are C90…C0…C270. EULUMDAT stores that half from C270 to C90.
+        intensities.reverse();
+    }
 
     Ok(TableDistribution {
         symmetry,

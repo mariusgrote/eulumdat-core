@@ -63,6 +63,13 @@ pub struct Eulumdat {
     /// Gamma angles, in degrees.
     pub gamma_angles: Vec<f64>,
     /// Stored luminous intensity rows indexed by C-plane, then gamma angle.
+    ///
+    /// Rows are in EULUMDAT file order. For [`Symmetry::None`],
+    /// [`Symmetry::C0C180`], and [`Symmetry::C0C180AndC90C270`], row `i`
+    /// belongs to `c_planes[i]`; [`Symmetry::Rotational`] stores one row. For
+    /// [`Symmetry::C90C270`] the rows start at C270 and run across the 0°/360°
+    /// wrap to C90 (C270, …, C345, C0, …, C90), although `c_planes` starts
+    /// at C0.
     pub intensities: Vec<Vec<f64>>,
 }
 
@@ -93,6 +100,8 @@ pub enum Symmetry {
     /// Symmetry between the C0 and C180 planes.
     C0C180,
     /// Symmetry between the C90 and C270 planes.
+    ///
+    /// Intensity rows are stored from C270 across C0 to C90.
     C90C270,
     /// Symmetry across both C0/C180 and C90/C270 axes.
     C0C180AndC90C270,
@@ -123,6 +132,13 @@ pub struct Distribution {
     /// Gamma angles, in degrees.
     pub gamma_angles: Vec<f64>,
     /// Stored luminous intensity rows indexed by C-plane, then gamma angle.
+    ///
+    /// Rows are in EULUMDAT file order. For [`Symmetry::None`],
+    /// [`Symmetry::C0C180`], and [`Symmetry::C0C180AndC90C270`], row `i`
+    /// belongs to `c_planes[i]`; [`Symmetry::Rotational`] stores one row. For
+    /// [`Symmetry::C90C270`] the rows start at C270 and run across the 0°/360°
+    /// wrap to C90 (C270, …, C345, C0, …, C90), although `c_planes` starts
+    /// at C0.
     pub intensities: Vec<Vec<f64>>,
 }
 

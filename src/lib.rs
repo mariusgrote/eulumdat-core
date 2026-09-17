@@ -94,6 +94,7 @@ mod parse;
 mod photometry;
 mod resample;
 mod serialize;
+mod symmetry;
 mod table_parser;
 mod ugr;
 mod validation;

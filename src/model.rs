@@ -50,7 +50,8 @@ pub struct Eulumdat {
     pub downward_flux_fraction: f64,
     /// Light output ratio recorded in the file, as a percentage.
     pub light_output_ratio: f64,
-    /// Conversion factor for luminous intensities.
+    /// Factor that converts stored optical cd/klm values to operating
+    /// luminous intensities.
     pub conversion_factor: f64,
     /// Luminaire tilt during measurement, in degrees.
     pub tilt: f64,

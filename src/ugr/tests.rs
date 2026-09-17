@@ -64,6 +64,7 @@ fn linear_model() -> Eulumdat {
     let mut model = Eulumdat {
         luminous_area_length: 1000.0,
         luminous_area_width: 500.0,
+        conversion_factor: 1.0,
         lamps: vec![LampSet {
             lamp_count: 1,
             lamp_type: "Synthetic LED".to_string(),
@@ -263,6 +264,18 @@ fn luminance_uses_first_lamp_set_flux() {
 
     model.lamps.clear();
     assert_eq!(model.luminance_at(45.0, 45.0), None);
+}
+
+#[test]
+fn luminance_uses_conversion_factor_once() {
+    let mut model = linear_model();
+    let baseline = model.luminance_at(45.0, 45.0).unwrap();
+
+    for factor in [0.5, 2.0] {
+        model.conversion_factor = factor;
+        let converted = model.luminance_at(45.0, 45.0).unwrap();
+        assert!((converted - factor * baseline).abs() <= 1e-12 * baseline);
+    }
 }
 
 #[test]

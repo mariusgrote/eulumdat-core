@@ -49,8 +49,9 @@ impl Eulumdat {
     ///
     /// Like eulumdat-luminance, luminance is first evaluated on the file's
     /// (C, gamma) grid as `I / A_proj` and then interpolated bilinearly. Grid
-    /// points with a non-positive projected area count as 0 cd/m². Intensities
-    /// are scaled with the flux of the first lamp set only.
+    /// points with a non-positive projected area count as 0 cd/m². Stored
+    /// cd/klm values are multiplied by the EULUMDAT conversion factor and the
+    /// total flux of the first lamp set to obtain operating intensities.
     ///
     /// Returns `None` if the luminous area is zero, no lamp set exists, or
     /// gamma lies outside the stored range.
@@ -60,11 +61,12 @@ impl Eulumdat {
             return None;
         }
         let flux_klm = self.lamps.first()?.total_luminous_flux / 1000.0;
+        let intensity_scale = self.conversion_factor * flux_klm;
 
         self.interpolate_on_grid(c_deg, gamma_deg, |c_plane, profile, gamma_idx| {
             let area = self.projected_area(c_plane, self.gamma_angles[gamma_idx]);
             if area > 0.0 {
-                profile[gamma_idx] * flux_klm / area
+                profile[gamma_idx] * intensity_scale / area
             } else {
                 0.0
             }

@@ -17,9 +17,13 @@ impl Eulumdat {
     /// Σ L²·ω/p² over all luminaires is computed once; every reflectance then
     /// yields `UGR = 8·log10(0.25 / L_b · Σ)`.
     ///
-    /// The values refer to the real flux of the first lamp set. eulumdat-ugr
-    /// multiplies that flux by the lamp count, although EULUMDAT already
-    /// stores the total flux of the set; both agree for single-lamp sets.
+    /// Glare-source luminance uses the stored cd/klm intensities multiplied by
+    /// [`Eulumdat::conversion_factor`] and by the total flux of the first lamp
+    /// set in klm. Field 26c is already the total flux of that set, so the lamp
+    /// count is not applied again. Background luminance uses that same lamp-set
+    /// flux and the light output ratio. The returned table therefore has
+    /// [`FluxBasis::LampFlux`](super::FluxBasis::LampFlux) as its native basis;
+    /// callers can request a 1000 lm basis from [`UgrTable`] accessors.
     pub fn ugr_table(&self) -> Result<UgrTable, Vec<UgrBlocker>> {
         let blockers = self.ugr_blockers();
         if blockers.is_empty() {

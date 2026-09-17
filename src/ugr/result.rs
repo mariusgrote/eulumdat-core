@@ -36,12 +36,20 @@ pub enum UgrView {
     Endwise,
 }
 
-/// Lamp flux the UGR values refer to.
+/// Lamp-flux basis used when reading values from a [`UgrTable`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FluxBasis {
-    /// Flux of the first lamp set, as stored in the file.
+    /// Total flux of the first lamp set, as stored in EULUMDAT field 26c.
+    ///
+    /// This is the table's native basis. It does not multiply the flux by the
+    /// lamp count. The EULUMDAT intensity conversion factor is already included
+    /// in the glare-source luminance and is not part of this flux value.
     LampFlux,
-    /// A lamp flux of 1000 lm, as in CIE 190 catalogue tables.
+    /// Rebase the native values to 1000 lm by subtracting
+    /// `8·log10(first_lamp_set_flux / 1000)`.
+    ///
+    /// This changes only the flux basis. It does not apply or remove the
+    /// EULUMDAT intensity conversion factor.
     Normalized1000Lm,
 }
 
@@ -51,7 +59,9 @@ pub enum FluxBasis {
 /// [`UGR_REFLECTANCES`]. Values are not rounded. A cell is `None` if no
 /// luminaire in the room contributes glare, for example with a beam too narrow
 /// to reach any observer position, or if the background luminance is not
-/// positive.
+/// positive. The native values use [`FluxBasis::LampFlux`]; the conversion
+/// factor has already been applied to the stored cd/klm intensities used for
+/// glare-source luminance.
 #[derive(Debug, Clone, PartialEq)]
 pub struct UgrTable {
     /// UGR values for the lamp flux, one row per room. Columns 0–4 are
@@ -82,6 +92,10 @@ impl UgrTable {
     #[must_use]
     /// Returns `8·log10(Φ / 1000)`, the difference between
     /// [`FluxBasis::LampFlux`] and [`FluxBasis::Normalized1000Lm`] values.
+    ///
+    /// `Φ` is the total flux of the first lamp set. The conversion factor is
+    /// already included in the native UGR values and does not enter this
+    /// correction.
     pub fn flux_correction(&self) -> f64 {
         8.0 * (self.lamp_flux / 1000.0).log10()
     }

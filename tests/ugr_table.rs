@@ -254,6 +254,43 @@ fn normalized_basis_subtracts_flux_correction() {
 }
 
 #[test]
+fn conversion_factor_changes_ugr_on_both_flux_bases() {
+    let baseline = table(&load_sample(4), "conversion factor 1");
+
+    for factor in [0.5_f64, 2.0] {
+        let mut model = load_sample(4);
+        model.conversion_factor = factor;
+        let converted = table(&model, &format!("conversion factor {factor}"));
+        let expected_difference = 16.0 * factor.log10();
+
+        assert_eq!(converted.lamp_flux(), baseline.lamp_flux());
+        assert_eq!(converted.flux_correction(), baseline.flux_correction());
+        for basis in [FluxBasis::LampFlux, FluxBasis::Normalized1000Lm] {
+            for room in 0..UGR_ROOMS.len() {
+                for view in [UgrView::Crosswise, UgrView::Endwise] {
+                    for reflectance in 0..UGR_REFLECTANCES.len() {
+                        let original = baseline
+                            .value(room, view, reflectance, basis)
+                            .expect("sample cell should have a UGR value");
+                        let actual = converted
+                            .value(room, view, reflectance, basis)
+                            .expect("converted sample cell should have a UGR value");
+                        assert!(actual.is_finite());
+                        assert!(
+                            (actual - original - expected_difference).abs() < 1e-9,
+                            "factor {factor}, basis {basis:?}, room {room}, view {view:?}, \
+                             reflectance {reflectance}: actual difference {}, expected \
+                             {expected_difference}",
+                            actual - original
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn rows_match_values_in_room_order() {
     let table = table(&load_sample(1), "sample 01");
     for basis in [FluxBasis::LampFlux, FluxBasis::Normalized1000Lm] {

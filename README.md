@@ -4,9 +4,9 @@
 
 `eulumdat-core` is a pure Rust library for EULUMDAT `.ldt` data.
 
-It is implemented from public EULUMDAT format documentation and independently
-authored tests. Third-party source files and template files are not
-redistributed in this crate.
+The core is implemented from public EULUMDAT format documentation and
+independently authored tests. The UGR module is ported from MIT-licensed Python
+packages; see [Provenance](#provenance).
 
 Milestone 1 is intentionally UI-free: no clipboard integration, rendering, FFI,
 installer, or Qt application integration is included.
@@ -58,3 +58,22 @@ or redistributed with this crate.
 
 The calculated direct-ratio helper is intentionally not included until its
 coefficient tables can be tied to an independent non-GPL source.
+
+### UGR calculation
+
+The UGR (Unified Glare Rating) code in `src/ugr/` follows CIE 117:1995 and
+CIE 190:2010. It is a Rust port of the logic in these MIT-licensed Python
+packages by 123VincentB:
+
+- [eulumdat-ugr](https://github.com/123VincentB/eulumdat-ugr): UGR table
+  calculation
+- [eulumdat-luminance](https://github.com/123VincentB/eulumdat-luminance):
+  luminance and projected luminous area
+
+The UGR test fixtures in `tests/fixtures/ugr/` come from eulumdat-ugr. They
+include sample `.ldt` files and reference tables from Relux, DIALux and
+CIE 190:2010. Reference values were also generated with eulumdat-ugr,
+eulumdat-luminance and [eulumdat-py](https://github.com/123VincentB/pyldt).
+These packages use the same MIT license as this crate; their copyright notice
+is in [LICENSE](LICENSE). `tests/fixtures/ugr/README.md` describes the fixtures
+in detail.

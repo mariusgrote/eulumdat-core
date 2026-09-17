@@ -95,6 +95,14 @@ mod photometry;
 mod resample;
 mod serialize;
 mod table_parser;
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "UGR helpers are wired into the public API in a later phase"
+    )
+)]
+mod ugr;
 mod validation;
 
 pub use crate::encoding::TextEncoding;

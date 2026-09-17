@@ -135,9 +135,7 @@ fn validation_hard_errors() {
 
     let mut ldt = common::synthetic_model(Symmetry::C0C180, TypeIndicator::PointSourceWithSymmetry);
     for row in &mut ldt.intensities {
-        for value in row {
-            *value = 0.5;
-        }
+        row.fill(0.5);
     }
     assert!(
         ldt.validate(ValidationSettings::unrestricted())

@@ -49,9 +49,11 @@ impl Eulumdat {
             let wall_flux_density = lamp_flux * grid.luminaire_count() as f64 / grid.wall_area();
             let background = fractions.background_luminance(room_index, wall_flux_density);
 
+            let (view_cells, remainder) = row.as_chunks_mut::<REFLECTANCE_COUNT>();
+            debug_assert!(remainder.is_empty());
             for (view, cells) in [UgrView::Crosswise, UgrView::Endwise]
                 .into_iter()
-                .zip(row.chunks_exact_mut(REFLECTANCE_COUNT))
+                .zip(view_cells)
             {
                 let Some(glare_sum) = self.glare_sum(&grid, view) else {
                     continue;

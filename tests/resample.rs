@@ -44,9 +44,7 @@ fn resample_gamma_keeps_shape() {
 fn scale_to_100_handles_zero_output() {
     let mut ldt = common::synthetic_model(Symmetry::C0C180, TypeIndicator::PointSourceWithSymmetry);
     for row in &mut ldt.intensities {
-        for value in row {
-            *value = 0.0;
-        }
+        row.fill(0.0);
     }
     let before = ldt.clone();
     ldt.scale_to_100_percent();
@@ -57,9 +55,7 @@ fn scale_to_100_handles_zero_output() {
 fn scale_to_100_with_flux_handles_zero_flux() {
     let mut ldt = common::synthetic_model(Symmetry::C0C180, TypeIndicator::PointSourceWithSymmetry);
     for row in &mut ldt.intensities {
-        for value in row {
-            *value = 0.0;
-        }
+        row.fill(0.0);
     }
     let before = ldt.clone();
     ldt.scale_to_100_percent_with_flux();

@@ -4,14 +4,14 @@ use std::path::PathBuf;
 
 use crate::{Distribution, Eulumdat, LampSet, Symmetry};
 
-const SAMPLE_COUNT: usize = 11;
+pub(super) const SAMPLE_COUNT: usize = 11;
 const MAX_RELATIVE_DEVIATION: f64 = 0.005;
 
-fn fixture_dir() -> PathBuf {
+pub(super) fn fixture_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ugr")
 }
 
-fn load_sample(number: usize) -> Eulumdat {
+pub(super) fn load_sample(number: usize) -> Eulumdat {
     let path = fixture_dir().join(format!("sample_{number:02}.ldt"));
     let text = fs::read_to_string(&path).expect("sample fixture should be readable");
     Eulumdat::parse(&text)

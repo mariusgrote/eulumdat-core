@@ -12,7 +12,32 @@
 //! comparable with their reference tables. Their copyright notice is in
 //! `LICENSE`.
 
+mod background;
+mod calculation;
+mod geometry;
+mod guth;
 mod luminance;
+mod tables;
 
+#[cfg_attr(
+    not(test),
+    expect(
+        unused_imports,
+        reason = "the UGR table is wired into the public API in a later phase"
+    )
+)]
+pub(crate) use calculation::UgrTable;
+#[cfg_attr(
+    not(test),
+    expect(
+        unused_imports,
+        reason = "the UGR table is wired into the public API in a later phase"
+    )
+)]
+pub(crate) use tables::UGR_REFLECTANCES;
+pub(crate) use tables::UGR_ROOMS;
+
+#[cfg(test)]
+mod table_tests;
 #[cfg(test)]
 mod tests;

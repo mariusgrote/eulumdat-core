@@ -4,41 +4,63 @@
 //! eulumdat-ugr sources (`guth.py`, `background.py`, commit `9f60147`).
 //! Do not edit by hand; regenerate instead.
 
+use super::{UgrReflectances, UgrRoom};
+
 /// Ceiling, wall, and working-plane reflectances of the UGR table columns.
 ///
 /// Source: CIE 190:2010, column order as in eulumdat-ugr `REFLECTANCES`.
-pub(crate) const UGR_REFLECTANCES: [(f64, f64, f64); 5] = [
-    (0.7, 0.5, 0.2),
-    (0.7, 0.3, 0.2),
-    (0.5, 0.5, 0.2),
-    (0.5, 0.3, 0.2),
-    (0.3, 0.3, 0.2),
+pub const UGR_REFLECTANCES: [UgrReflectances; 5] = [
+    UgrReflectances {
+        ceiling: 0.7,
+        walls: 0.5,
+        floor: 0.2,
+    },
+    UgrReflectances {
+        ceiling: 0.7,
+        walls: 0.3,
+        floor: 0.2,
+    },
+    UgrReflectances {
+        ceiling: 0.5,
+        walls: 0.5,
+        floor: 0.2,
+    },
+    UgrReflectances {
+        ceiling: 0.5,
+        walls: 0.3,
+        floor: 0.2,
+    },
+    UgrReflectances {
+        ceiling: 0.3,
+        walls: 0.3,
+        floor: 0.2,
+    },
 ];
 
 /// Room dimensions X × Y as multiples of the mounting height H.
 ///
 /// X is across and Y along the line of sight. Source: CIE 190:2010, room order
 /// as in eulumdat-ugr `_ROOM_CONFIGS`.
-pub(crate) const UGR_ROOMS: [(u8, u8); 19] = [
-    (2, 2),
-    (2, 3),
-    (2, 4),
-    (2, 6),
-    (2, 8),
-    (2, 12),
-    (4, 2),
-    (4, 3),
-    (4, 4),
-    (4, 6),
-    (4, 8),
-    (4, 12),
-    (8, 4),
-    (8, 6),
-    (8, 8),
-    (8, 12),
-    (12, 4),
-    (12, 6),
-    (12, 8),
+pub const UGR_ROOMS: [UgrRoom; 19] = [
+    UgrRoom { x_h: 2, y_h: 2 },
+    UgrRoom { x_h: 2, y_h: 3 },
+    UgrRoom { x_h: 2, y_h: 4 },
+    UgrRoom { x_h: 2, y_h: 6 },
+    UgrRoom { x_h: 2, y_h: 8 },
+    UgrRoom { x_h: 2, y_h: 12 },
+    UgrRoom { x_h: 4, y_h: 2 },
+    UgrRoom { x_h: 4, y_h: 3 },
+    UgrRoom { x_h: 4, y_h: 4 },
+    UgrRoom { x_h: 4, y_h: 6 },
+    UgrRoom { x_h: 4, y_h: 8 },
+    UgrRoom { x_h: 4, y_h: 12 },
+    UgrRoom { x_h: 8, y_h: 4 },
+    UgrRoom { x_h: 8, y_h: 6 },
+    UgrRoom { x_h: 8, y_h: 8 },
+    UgrRoom { x_h: 8, y_h: 12 },
+    UgrRoom { x_h: 12, y_h: 4 },
+    UgrRoom { x_h: 12, y_h: 6 },
+    UgrRoom { x_h: 12, y_h: 8 },
 ];
 
 /// Room index k = X·Y / (H·(X + Y)) of each room in [`UGR_ROOMS`], rounded to

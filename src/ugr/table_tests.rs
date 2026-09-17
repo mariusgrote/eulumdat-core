@@ -1,191 +1,67 @@
-// UGR table tests. They live inside the crate because `UgrTable` stays
-// crate-private until the public API is added in a later phase.
+// UGR tests that need crate-internal access. The golden tests against the
+// reference tables use the public API and live in tests/ugr_table.rs.
 
-use std::fmt;
-use std::fs;
 use std::time::Instant;
 
 use super::background::FluxFractions;
+use super::geometry::CATALOGUE_SPACING_TO_HEIGHT;
 use super::guth::position_index;
-use super::tests::{SAMPLE_COUNT, fixture_dir, load_sample};
-use super::{UGR_REFLECTANCES, UGR_ROOMS, UgrTable};
-use crate::{Distribution, Eulumdat, Symmetry};
+use super::tests::load_sample;
+use super::ugr_reference::{Deviation, Reference, SAMPLE_COUNT, read_reference, round_to_tenth};
+use super::{UGR_REFLECTANCES, UGR_ROOMS, UgrReflectances, UgrRoom, UgrTable, UgrView};
+use crate::{Distribution, Eulumdat, FluxBasis};
 
+const CIE_190_TOLERANCE: f64 = 0.3;
 const PYTHON_TOLERANCE: f64 = 0.05;
 const RELUX_TOLERANCE: f64 = 0.5;
-const CIE_190_TOLERANCE: f64 = 0.3;
-const SYMMETRY_TOLERANCE: f64 = 0.05;
-
-/// Samples whose Python reference values are affected by the deliberate γ > 90°
-/// deviation in `FluxFractions::new` and are therefore not held to
-/// [`PYTHON_TOLERANCE`].
-///
-/// Empty: every sample stores γ from 0° to 180°, so all 18 zone midpoints lie
-/// inside the measured range and both implementations use the same zonal
-/// fluxes. `python_parity` checks this for each sample it holds to the
-/// tolerance, so a new sample that only covers γ ≤ 90° fails until it is
-/// listed here with a reason.
-const GAMMA_90_CORRECTED_SAMPLES: &[usize] = &[];
-
-/// Parsed reference cell: an exact value, or Relux's "<10.0" upper bound.
-#[derive(Debug, Clone, Copy)]
-enum Reference {
-    Value(f64),
-    Below(f64),
-}
-
-fn read_reference(name: &str) -> Vec<Vec<Reference>> {
-    let path = fixture_dir().join("reference").join(name);
-    let text = fs::read_to_string(&path)
-        .unwrap_or_else(|error| panic!("{} should be readable: {error}", path.display()));
-    let table: Vec<Vec<Reference>> = text
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| {
-            line.split(',')
-                .map(|cell| {
-                    let cell = cell.trim();
-                    let parse = |value: &str| -> f64 {
-                        value
-                            .parse()
-                            .unwrap_or_else(|_| panic!("{name}: invalid cell {cell:?}"))
-                    };
-                    match cell.strip_prefix('<') {
-                        Some(bound) => Reference::Below(parse(bound)),
-                        None => Reference::Value(parse(cell)),
-                    }
-                })
-                .collect()
-        })
-        .collect();
-    assert_eq!(table.len(), 19, "{name}: row count");
-    assert!(table.iter().all(|row| row.len() == 10), "{name}: columns");
-    table
-}
 
 fn computed(table: &UgrTable, number: usize, row: usize, column: usize) -> f64 {
-    table.values[row][column]
+    let (view, reflectance) = if column < 5 {
+        (UgrView::Crosswise, column)
+    } else {
+        (UgrView::Endwise, column - 5)
+    };
+    table
+        .value(row, view, reflectance, FluxBasis::LampFlux)
         .unwrap_or_else(|| panic!("sample {number:02} cell [{row}][{column}] is not computed"))
 }
 
-fn round_to_tenth(value: f64) -> f64 {
-    (value * 10.0).round() / 10.0
+fn all_cells(table: &UgrTable) -> impl Iterator<Item = Option<f64>> + '_ {
+    table
+        .rows(FluxBasis::LampFlux)
+        .flat_map(|row| row.crosswise.into_iter().chain(row.endwise))
 }
 
-/// Largest deviation of the table from a reference, with the position.
-#[derive(Default, Clone, Copy)]
-struct Deviation {
-    max: f64,
-    number: usize,
-    row: usize,
-    column: usize,
-}
-
-impl fmt::Display for Deviation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{:.3} (sample {:02}, row {}, column {})",
-            self.max, self.number, self.row, self.column
-        )
-    }
-}
-
-impl Deviation {
-    fn record(&mut self, deviation: f64, number: usize, row: usize, column: usize) {
-        if deviation > self.max {
-            *self = Self {
-                max: deviation,
-                number,
-                row,
-                column,
+#[test]
+fn blocked_sample_06_matches_references() {
+    // The public API blocks sample 06 for its 80 % upward share (see
+    // tests/ugr_table.rs), but its table is still held to the references.
+    let model = load_sample(6);
+    assert!(model.ugr_table().is_err());
+    let table = unchecked(&model);
+    let python = read_reference("ugr_table_06_python.csv");
+    let relux = read_reference("ugr_table_06_Relux.csv");
+    for (row, (python, relux)) in python.iter().zip(&relux).enumerate() {
+        for (column, (python, relux)) in python.iter().zip(relux).enumerate() {
+            let actual = computed(&table, 6, row, column);
+            let Reference::Value(python) = *python else {
+                panic!("python reference has no bounds");
             };
+            assert!(
+                (actual - python).abs() <= PYTHON_TOLERANCE,
+                "[{row}][{column}]: {actual} vs python {python}"
+            );
+            let rounded = round_to_tenth(actual);
+            let deviation = match *relux {
+                Reference::Value(expected) => (rounded - expected).abs(),
+                Reference::Below(bound) => (rounded - bound).max(0.0),
+            };
+            assert!(
+                deviation <= RELUX_TOLERANCE,
+                "[{row}][{column}]: {actual} vs Relux {relux:?}"
+            );
         }
     }
-}
-
-#[test]
-fn python_parity() {
-    let mut overall = Deviation::default();
-    for number in 1..=SAMPLE_COUNT {
-        if GAMMA_90_CORRECTED_SAMPLES.contains(&number) {
-            continue;
-        }
-        let model = load_sample(number);
-        assert!(
-            model.gamma_angles.first() == Some(&0.0) && model.gamma_angles.last() >= Some(&175.0),
-            "sample {number:02} does not cover all zone midpoints; \
-             list it in GAMMA_90_CORRECTED_SAMPLES"
-        );
-        let table = model.ugr_table();
-        let reference = read_reference(&format!("ugr_table_{number:02}_python.csv"));
-        for (row, cells) in reference.iter().enumerate() {
-            for (column, cell) in cells.iter().enumerate() {
-                let Reference::Value(expected) = *cell else {
-                    panic!("python reference has no bounds");
-                };
-                let actual = computed(&table, number, row, column);
-                let deviation = (actual - expected).abs();
-                assert!(
-                    deviation <= PYTHON_TOLERANCE,
-                    "sample {number:02} [{row}][{column}]: {actual} vs python {expected}"
-                );
-                overall.record(deviation, number, row, column);
-            }
-        }
-    }
-    println!("max deviation from Python: {overall}");
-}
-
-#[test]
-fn golden_relux() {
-    let mut overall = Deviation::default();
-    for number in 1..=SAMPLE_COUNT {
-        let table = load_sample(number).ugr_table();
-        let reference = read_reference(&format!("ugr_table_{number:02}_Relux.csv"));
-        for (row, cells) in reference.iter().enumerate() {
-            for (column, cell) in cells.iter().enumerate() {
-                let actual = round_to_tenth(computed(&table, number, row, column));
-                let deviation = match *cell {
-                    Reference::Value(expected) => (actual - expected).abs(),
-                    Reference::Below(bound) => (actual - bound).max(0.0),
-                };
-                assert!(
-                    deviation <= RELUX_TOLERANCE,
-                    "sample {number:02} [{row}][{column}]: {actual} vs Relux {cell:?}"
-                );
-                overall.record(deviation, number, row, column);
-            }
-        }
-    }
-    println!("max deviation from Relux: {overall}");
-}
-
-#[test]
-fn report_dialux_deviation() {
-    // DIALux deviates by up to about 1.0 UGR, so this only reports.
-    let mut overall = Deviation::default();
-    for number in 1..=SAMPLE_COUNT {
-        let table = load_sample(number).ugr_table();
-        let reference = read_reference(&format!("ugr_table_{number:02}_Dialux.csv"));
-        let mut sample = Deviation::default();
-        for (row, cells) in reference.iter().enumerate() {
-            for (column, cell) in cells.iter().enumerate() {
-                let Reference::Value(expected) = *cell else {
-                    panic!("DIALux reference has no bounds");
-                };
-                let actual = round_to_tenth(computed(&table, number, row, column));
-                let deviation = (actual - expected).abs();
-                sample.record(deviation, number, row, column);
-                overall.record(deviation, number, row, column);
-            }
-        }
-        println!(
-            "sample {number:02}: max deviation from DIALux {:.1}",
-            sample.max
-        );
-    }
-    println!("max deviation from DIALux: {overall}");
 }
 
 #[test]
@@ -219,48 +95,6 @@ fn sample_11_matches_cie_190() {
 }
 
 #[test]
-fn doubling_flux_adds_8_log10_2() {
-    let expected = 8.0 * 2.0_f64.log10();
-    for number in [1, 5, 11] {
-        let mut model = load_sample(number);
-        let single = model.ugr_table();
-        model.lamps[0].total_luminous_flux *= 2.0;
-        let doubled = model.ugr_table();
-        assert_eq!(doubled.lamp_flux, 2.0 * single.lamp_flux);
-        for row in 0..19 {
-            for column in 0..10 {
-                let difference = computed(&doubled, number, row, column)
-                    - computed(&single, number, row, column);
-                assert!(
-                    (difference - expected).abs() < 1e-9,
-                    "sample {number:02} [{row}][{column}]: +{difference}"
-                );
-            }
-        }
-    }
-}
-
-#[test]
-fn rotational_symmetry_gives_equal_orientations() {
-    for number in [5, 8, 9] {
-        let model = load_sample(number);
-        assert_eq!(model.symmetry, Symmetry::Rotational, "sample {number:02}");
-        assert_eq!(model.luminous_area_width, 0.0, "sample {number:02}");
-        let table = model.ugr_table();
-        for row in 0..19 {
-            for column in 0..5 {
-                let crosswise = computed(&table, number, row, column);
-                let endwise = computed(&table, number, row, column + 5);
-                assert!(
-                    (crosswise - endwise).abs() <= SYMMETRY_TOLERANCE,
-                    "sample {number:02} row {row}: {crosswise} vs {endwise}"
-                );
-            }
-        }
-    }
-}
-
-#[test]
 fn upper_zones_without_data_have_no_flux() {
     // Sample 11 emits 2.58 cd/klm at 90° and nothing above. Cut at 90°, the
     // file must keep its flux fractions and UGR table. eulumdat-ugr would
@@ -268,7 +102,7 @@ fn upper_zones_without_data_have_no_flux() {
     let full = load_sample(11);
     let lower = truncated_at_90(&full);
     assert_eq!(FluxFractions::new(&lower), FluxFractions::new(&full));
-    assert_eq!(lower.ugr_table(), full.ugr_table());
+    assert_eq!(unchecked(&lower), unchecked(&full));
 
     // Sample 4 has upward light; cut at 90° it matches the file with every
     // intensity above 90° set to zero (both use a 5° grid).
@@ -284,14 +118,11 @@ fn upper_zones_without_data_have_no_flux() {
     let lower = truncated_at_90(&full);
     assert_eq!(FluxFractions::new(&lower), FluxFractions::new(&dark_above));
     assert_ne!(FluxFractions::new(&lower), FluxFractions::new(&full));
-    assert!(
-        lower
-            .ugr_table()
-            .values
-            .iter()
-            .flatten()
-            .all(Option::is_some)
-    );
+    assert!(all_cells(&unchecked(&lower)).all(|cell| cell.is_some()));
+}
+
+fn unchecked(ldt: &Eulumdat) -> UgrTable {
+    ldt.ugr_table_with_spacing(CATALOGUE_SPACING_TO_HEIGHT)
 }
 
 /// `ldt` with the distribution cut after the 90° gamma angle.
@@ -323,22 +154,27 @@ fn truncated_at_90(ldt: &Eulumdat) -> Eulumdat {
 fn missing_lamps_or_distribution_yield_empty_table() {
     let mut model = load_sample(1);
     model.lamps.clear();
-    let table = model.ugr_table();
-    assert_eq!(table.lamp_flux, 0.0);
-    assert!(table.values.iter().flatten().all(Option::is_none));
+    let table = unchecked(&model);
+    assert_eq!(table.lamp_flux(), 0.0);
+    assert!(all_cells(&table).all(|cell| cell.is_none()));
 
-    let table = Eulumdat::default().ugr_table();
-    assert!(table.values.iter().flatten().all(Option::is_none));
+    let table = unchecked(&Eulumdat::default());
+    assert!(all_cells(&table).all(|cell| cell.is_none()));
 }
 
 #[test]
 fn constants_follow_cie_190_order() {
-    assert_eq!(UGR_ROOMS[0], (2, 2));
-    assert_eq!(UGR_ROOMS[10], (4, 8));
-    assert_eq!(UGR_ROOMS[18], (12, 8));
-    assert_eq!(UGR_REFLECTANCES[0], (0.7, 0.5, 0.2));
-    assert_eq!(UGR_REFLECTANCES[4], (0.3, 0.3, 0.2));
-    for (room, &(x, y)) in UGR_ROOMS.iter().enumerate() {
+    assert_eq!(UGR_ROOMS[0], UgrRoom { x_h: 2, y_h: 2 });
+    assert_eq!(UGR_ROOMS[10], UgrRoom { x_h: 4, y_h: 8 });
+    assert_eq!(UGR_ROOMS[18], UgrRoom { x_h: 12, y_h: 8 });
+    let reflectances = |ceiling, walls, floor| UgrReflectances {
+        ceiling,
+        walls,
+        floor,
+    };
+    assert_eq!(UGR_REFLECTANCES[0], reflectances(0.7, 0.5, 0.2));
+    assert_eq!(UGR_REFLECTANCES[4], reflectances(0.3, 0.3, 0.2));
+    for (room, &UgrRoom { x_h: x, y_h: y }) in UGR_ROOMS.iter().enumerate() {
         let k = f64::from(x) * f64::from(y) / f64::from(x + y);
         assert!(
             (super::tables::ROOM_K[room] - k).abs() < 0.006,
@@ -361,7 +197,7 @@ fn ugr_table_timing() {
     let start = Instant::now();
     for _ in 0..ROUNDS {
         for model in &models {
-            std::hint::black_box(model.ugr_table());
+            std::hint::black_box(model.ugr_table().expect("sample is not blocked"));
         }
     }
     let per_table = start.elapsed() / (ROUNDS * SAMPLE_COUNT as u32);

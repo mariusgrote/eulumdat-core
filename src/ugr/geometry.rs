@@ -1,3 +1,5 @@
+use super::UgrView;
+
 /// Mounting height H of the luminaires above the observer's eye, in m.
 ///
 /// Fixed by CIE 190:2010 §4.2; the table is independent of H because all room
@@ -9,15 +11,6 @@ pub(crate) const CATALOGUE_SPACING_TO_HEIGHT: f64 = 0.25;
 const GAMMA_MAX_DEG: f64 = 85.0;
 /// Luminaires with a larger T/R ratio are ignored (CIE 117:1995 §4.5).
 const T_R_MAX: f64 = 3.0;
-
-/// Direction of the luminaire's C0–C180 axis relative to the line of sight.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Orientation {
-    /// Luminaire axis across the line of sight; C = atan2(T, R).
-    Crosswise,
-    /// Luminaire axis along the line of sight; C = 90° − atan2(T, R).
-    Endwise,
-}
 
 /// Regular luminaire grid of one CIE 190 room, ported from eulumdat-ugr
 /// `UgrGrid`.
@@ -85,10 +78,7 @@ impl RoomGrid {
     ///
     /// Each yielded position stands for the mirrored pair at ±T, which has the
     /// same geometry; callers count it twice.
-    pub(crate) fn half_luminaires(
-        &self,
-        orientation: Orientation,
-    ) -> impl Iterator<Item = Luminaire> {
+    pub(crate) fn half_luminaires(&self, view: UgrView) -> impl Iterator<Item = Luminaire> {
         let spacing = self.spacing;
         let half_columns = self.half_columns;
         (0..self.rows).flat_map(move |row| {
@@ -101,9 +91,10 @@ impl RoomGrid {
                     return None;
                 }
                 let azimuth = t.atan2(r).to_degrees();
-                let c_deg = match orientation {
-                    Orientation::Crosswise => azimuth,
-                    Orientation::Endwise => 90.0 - azimuth,
+                let c_deg = match view {
+                    // Crosswise: C = atan2(T, R); endwise: C = 90° − atan2(T, R).
+                    UgrView::Crosswise => azimuth,
+                    UgrView::Endwise => 90.0 - azimuth,
                 };
                 Some(Luminaire {
                     r,

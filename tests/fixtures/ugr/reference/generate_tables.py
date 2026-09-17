@@ -97,14 +97,20 @@ def main() -> None:
     out.append("//! eulumdat-ugr sources (`guth.py`, `background.py`, commit `9f60147`).")
     out.append("//! Do not edit by hand; regenerate instead.")
     out.append("")
+    out.append("use super::{UgrReflectances, UgrRoom};")
+    out.append("")
 
     out.append("/// Ceiling, wall, and working-plane reflectances of the UGR table columns.")
     out.append("///")
     out.append("/// Source: CIE 190:2010, column order as in eulumdat-ugr `REFLECTANCES`.")
-    out.append(f"pub(crate) const UGR_REFLECTANCES: [(f64, f64, f64); {REFLECTANCE_COUNT}] = [")
+    out.append(f"pub const UGR_REFLECTANCES: [UgrReflectances; {REFLECTANCE_COUNT}] = [")
     for name in reflectances:
-        parts = [int(part) / 100 for part in name.split("/")]
-        out.append("    (" + ", ".join(number(part) for part in parts) + "),")
+        ceiling, walls, floor = (number(int(part) / 100) for part in name.split("/"))
+        out.append("    UgrReflectances {")
+        out.append(f"        ceiling: {ceiling},")
+        out.append(f"        walls: {walls},")
+        out.append(f"        floor: {floor},")
+        out.append("    },")
     out.append("];")
     out.append("")
 
@@ -112,9 +118,9 @@ def main() -> None:
     out.append("///")
     out.append("/// X is across and Y along the line of sight. Source: CIE 190:2010, room order")
     out.append("/// as in eulumdat-ugr `_ROOM_CONFIGS`.")
-    out.append(f"pub(crate) const UGR_ROOMS: [(u8, u8); {ROOM_COUNT}] = [")
+    out.append(f"pub const UGR_ROOMS: [UgrRoom; {ROOM_COUNT}] = [")
     for x, y in rooms:
-        out.append(f"    ({int(x)}, {int(y)}),")
+        out.append(f"    UgrRoom {{ x_h: {int(x)}, y_h: {int(y)} }},")
     out.append("];")
     out.append("")
 

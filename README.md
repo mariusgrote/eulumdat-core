@@ -34,6 +34,69 @@ file APIs decode UTF-8 first and fall back to Windows-1252 for legacy files.
 String APIs such as `Eulumdat::parse` assume the caller has already decoded the
 text.
 
+## UGR
+
+`Eulumdat::ugr_table` computes the UGR (Unified Glare Rating) table with the
+tabular method of CIE 117:1995 and CIE 190:2010: 19 standard rooms, crosswise
+and endwise, five reflectance combinations. If the method does not apply to
+the luminaire, it returns every reason as a `UgrBlocker` instead of values.
+
+```rust
+use eulumdat_core::{Eulumdat, FluxBasis};
+
+fn main() -> Result<(), eulumdat_core::EulumdatError> {
+    let (ldt, _warnings) = Eulumdat::from_path("luminaire.ldt")?;
+    match ldt.ugr_table() {
+        Ok(table) => {
+            let (crosswise, endwise) = table.data_sheet_value(FluxBasis::LampFlux);
+            println!("UGR 4H x 8H, 70/50/20: {crosswise:?} / {endwise:?}");
+            for row in table.rows(FluxBasis::Normalized1000Lm) {
+                println!("{:?}: {:?} {:?}", row.room, row.crosswise, row.endwise);
+            }
+        }
+        Err(blockers) => {
+            for blocker in blockers {
+                println!("UGR table not applicable: {blocker}");
+            }
+        }
+    }
+    Ok(())
+}
+```
+
+Values are not rounded; round to 0.1 for display.
+
+### Limits of the method
+
+The table describes glare in idealized rooms with a regular luminaire grid.
+It does not replace a UGR calculation of a real room. See the ZVEI position
+paper "UGR method – application and limits". The crate blocks the table if:
+
+- the luminous area or the lamp flux of the first lamp set is zero, or the
+  light output ratio is zero
+- the intensity distribution is inconsistent or has no light
+- the gamma angles do not cover 0° to 90°
+- gamma angles are more than 5° or C-planes more than 15° apart
+  (DIN EN 13032-2)
+- more than 65 % of the flux is emitted upwards (LiTG Publ. 20)
+- intensities of mirrored C-planes (C0–C180 and C90–C270 symmetry) differ by
+  more than 5 % of the peak intensity; the method only evaluates the quadrant
+  C 0–90°
+
+### Sources
+
+- CIE 117:1995 "Discomfort Glare in Interior Lighting"
+- CIE 190:2010 "Calculation and Presentation of Unified Glare Rating Tables
+  for Indoor Lighting Luminaires"
+- [eulumdat-ugr](https://github.com/123VincentB/eulumdat-ugr) and
+  [eulumdat-luminance](https://github.com/123VincentB/eulumdat-luminance)
+  (MIT), which this implementation ports
+
+The CIE tables (Guth position index, `F_GL` and `F_T` factors) are taken from
+the eulumdat-ugr open-source transcription. They have not been checked against
+the texts of the standards. Results agree with Relux within 0.5 UGR on the
+reference samples; see [UGR calculation](#ugr-calculation).
+
 ## Provenance
 
 The crate is intended to be implemented from public EULUMDAT format

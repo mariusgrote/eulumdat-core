@@ -1,21 +1,14 @@
 use std::f64::consts::PI;
 use std::fs;
-use std::path::PathBuf;
 
+use super::ugr_reference::{SAMPLE_COUNT, fixture_dir, read_sample_text};
 use crate::{Distribution, Eulumdat, LampSet, Symmetry};
 
-pub(super) const SAMPLE_COUNT: usize = 11;
 const MAX_RELATIVE_DEVIATION: f64 = 0.005;
 
-pub(super) fn fixture_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ugr")
-}
-
 pub(super) fn load_sample(number: usize) -> Eulumdat {
-    let path = fixture_dir().join(format!("sample_{number:02}.ldt"));
-    let text = fs::read_to_string(&path).expect("sample fixture should be readable");
-    Eulumdat::parse(&text)
-        .unwrap_or_else(|error| panic!("{} should parse: {error}", path.display()))
+    Eulumdat::parse(&read_sample_text(number))
+        .unwrap_or_else(|error| panic!("sample {number:02} should parse: {error}"))
         .0
 }
 

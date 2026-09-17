@@ -95,13 +95,6 @@ mod photometry;
 mod resample;
 mod serialize;
 mod table_parser;
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "UGR helpers are wired into the public API in a later phase"
-    )
-)]
 mod ugr;
 mod validation;
 
@@ -116,3 +109,7 @@ pub use crate::model::{
     Distribution, Eulumdat, LampSet, Symmetry, TypeIndicator, ValidationSettings,
 };
 pub use crate::table_parser::{TableDistribution, parse_table_text};
+pub use crate::ugr::{
+    FluxBasis, UGR_REFLECTANCES, UGR_ROOMS, UgrBlocker, UgrReflectances, UgrRoom, UgrRow, UgrTable,
+    UgrView,
+};

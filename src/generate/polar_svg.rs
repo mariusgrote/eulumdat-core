@@ -54,7 +54,8 @@ pub enum PlanePair {
 pub enum IntensityMode {
     /// Plot values as stored in EULUMDAT, in candela per kilolumen.
     StoredCandelaPerKilolumen,
-    /// Plot values multiplied by the model conversion factor.
+    /// Plot operating cd/klm values: stored values multiplied by the model's
+    /// EULUMDAT conversion factor.
     ConvertedByFactor,
 }
 

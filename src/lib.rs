@@ -94,7 +94,9 @@ mod parse;
 mod photometry;
 mod resample;
 mod serialize;
+mod symmetry;
 mod table_parser;
+mod ugr;
 mod validation;
 
 pub use crate::encoding::TextEncoding;
@@ -108,3 +110,7 @@ pub use crate::model::{
     Distribution, Eulumdat, LampSet, Symmetry, TypeIndicator, ValidationSettings,
 };
 pub use crate::table_parser::{TableDistribution, parse_table_text};
+pub use crate::ugr::{
+    FluxBasis, UGR_REFLECTANCES, UGR_ROOMS, UgrBlocker, UgrReflectances, UgrRoom, UgrRow, UgrTable,
+    UgrView,
+};

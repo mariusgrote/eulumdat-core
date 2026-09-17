@@ -75,3 +75,18 @@ fn table_parser_rejects_invalid_tables() {
         assert!(error.contains(expected), "{error}");
     }
 }
+
+#[test]
+fn table_parser_stores_c90_c270_rows_from_c270_to_c90() {
+    let parsed = parse_table_text(&common::table_text(&[90.0, 135.0, 180.0, 225.0, 270.0]))
+        .expect("table should parse");
+    assert_eq!(parsed.symmetry, Symmetry::C90C270);
+    assert_eq!(
+        parsed.c_planes,
+        vec![0.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0]
+    );
+    // Column k of the table holds 10 + gamma index + k. Rows are stored as
+    // C270, C315 (mirror of C225), C0 (mirror of C180), C45, C90.
+    let first_values: Vec<f64> = parsed.intensities.iter().map(|row| row[0]).collect();
+    assert_eq!(first_values, vec![14.0, 13.0, 12.0, 11.0, 10.0]);
+}

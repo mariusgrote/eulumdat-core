@@ -5,8 +5,6 @@ edition = "2024"
 license = "MIT"
 description = "Pure Rust EULUMDAT .ldt parsing, validation, serialization, and photometry"
 repository = "https://github.com/mariusgrote/eulumdat-core"
-# Third-party UGR sample and reference data stays in the repository only.
-exclude = ["tests/fixtures/ugr"]
 
 [lints.rust]
 unsafe_code = "deny"

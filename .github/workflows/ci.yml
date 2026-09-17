@@ -39,3 +39,14 @@ jobs:
 
       - name: Lint
         run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test packaged crate
+        shell: bash
+        run: |
+          cargo package
+          archive=$(find target/package -maxdepth 1 -type f -name 'eulumdat-core-*.crate' -print -quit)
+          package_dir=$(mktemp -d)
+          tar -xzf "$archive" -C "$package_dir"
+          package_root=$(find "$package_dir" -mindepth 1 -maxdepth 1 -type d -print -quit)
+          cd "$package_root"
+          cargo test --workspace --all-targets --all-features

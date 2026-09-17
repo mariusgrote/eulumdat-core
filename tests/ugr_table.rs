@@ -429,7 +429,7 @@ fn valid_synthetic_model_is_not_blocked() {
         row.crosswise
             .iter()
             .chain(&row.endwise)
-            .all(Option::is_some)
+            .all(|cell| cell.is_some_and(f64::is_finite))
     }));
 }
 
@@ -455,6 +455,10 @@ fn missing_lamp_flux_blocks() {
 
     model.lamps.clear();
     assert_eq!(blockers(&model), [UgrBlocker::NoLampFlux]);
+
+    let mut model = valid_model();
+    model.lamps[0].total_luminous_flux = f64::INFINITY;
+    assert_eq!(blockers(&model), [UgrBlocker::NoLampFlux]);
 }
 
 #[test]
@@ -462,6 +466,25 @@ fn zero_light_output_ratio_blocks() {
     let mut model = valid_model();
     model.light_output_ratio = 0.0;
     assert_eq!(blockers(&model), [UgrBlocker::NoLightOutputRatio]);
+
+    model.light_output_ratio = f64::INFINITY;
+    assert_eq!(blockers(&model), [UgrBlocker::NoLightOutputRatio]);
+}
+
+#[test]
+fn invalid_conversion_factor_blocks() {
+    for factor in [f64::NAN, f64::INFINITY] {
+        let mut model = valid_model();
+        model.conversion_factor = factor;
+        assert_eq!(blockers(&model), [UgrBlocker::InvalidConversionFactor]);
+    }
+}
+
+#[test]
+fn non_finite_luminous_geometry_blocks() {
+    let mut model = valid_model();
+    model.luminous_area_height_c90 = f64::INFINITY;
+    assert_eq!(blockers(&model), [UgrBlocker::NoLuminousArea]);
 }
 
 #[test]
@@ -480,6 +503,23 @@ fn invalid_distribution_blocks() {
         .iter_mut()
         .flatten()
         .for_each(|v| *v = 0.0);
+    assert_eq!(blockers(&model), [UgrBlocker::InvalidDistribution]);
+
+    for intensity in [-1.0, f64::NAN, f64::INFINITY] {
+        let mut model = valid_model();
+        model.intensities[3][4] = intensity;
+        assert_eq!(blockers(&model), [UgrBlocker::InvalidDistribution]);
+    }
+}
+
+#[test]
+fn non_finite_angles_block() {
+    let mut model = valid_model();
+    model.c_planes[3] = f64::NAN;
+    assert_eq!(blockers(&model), [UgrBlocker::InvalidDistribution]);
+
+    let mut model = valid_model();
+    model.gamma_angles[3] = f64::INFINITY;
     assert_eq!(blockers(&model), [UgrBlocker::InvalidDistribution]);
 }
 
@@ -680,11 +720,33 @@ fn all_blockers_are_reported_together() {
 }
 
 #[test]
+fn invalid_numeric_inputs_report_all_matching_blockers() {
+    let mut model = valid_model();
+    model.luminous_area_length = f64::INFINITY;
+    model.lamps[0].total_luminous_flux = f64::INFINITY;
+    model.light_output_ratio = f64::INFINITY;
+    model.conversion_factor = f64::NAN;
+    model.intensities[0][0] = -1.0;
+
+    assert_eq!(
+        blockers(&model),
+        [
+            UgrBlocker::NoLuminousArea,
+            UgrBlocker::NoLampFlux,
+            UgrBlocker::NoLightOutputRatio,
+            UgrBlocker::InvalidConversionFactor,
+            UgrBlocker::InvalidDistribution,
+        ]
+    );
+}
+
+#[test]
 fn blockers_display_short_messages() {
     let blockers = [
         UgrBlocker::NoLuminousArea,
         UgrBlocker::NoLampFlux,
         UgrBlocker::NoLightOutputRatio,
+        UgrBlocker::InvalidConversionFactor,
         UgrBlocker::InvalidDistribution,
         UgrBlocker::IncompleteDistribution {
             min_gamma: Some(0.0),
@@ -713,14 +775,14 @@ fn blockers_display_short_messages() {
     for message in &messages {
         assert!(message.contains(" -> ") && message.len() < 100, "{message}");
     }
-    assert_eq!(messages[4], "Gamma angles = 0°..80° -> must cover 0°..90°");
+    assert_eq!(messages[5], "Gamma angles = 0°..80° -> must cover 0°..90°");
     assert_eq!(
-        messages[6],
+        messages[7],
         "Angle steps = gamma 5°, C 30° -> too coarse (max gamma 5°, C 15°)"
     );
-    assert_eq!(messages[8], "Upward flux fraction = 80.2 % -> above 65 %");
+    assert_eq!(messages[9], "Upward flux fraction = 80.2 % -> above 65 %");
     assert_eq!(
-        messages[9],
+        messages[10],
         "Asymmetry = 12.3 % of peak intensity -> above 5 %"
     );
 }

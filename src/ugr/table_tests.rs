@@ -163,6 +163,33 @@ fn missing_lamps_or_distribution_yield_empty_table() {
 }
 
 #[test]
+fn non_finite_rebased_values_are_not_exposed_as_cells() {
+    let mut values = [[None; 2 * UGR_REFLECTANCES.len()]; UGR_ROOMS.len()];
+    values[0][0] = Some(1.0);
+    let table = UgrTable {
+        values,
+        lamp_flux: f64::from_bits(1),
+    };
+
+    assert_eq!(
+        table.value(0, UgrView::Crosswise, 0, FluxBasis::LampFlux),
+        Some(1.0)
+    );
+    assert_eq!(
+        table.value(0, UgrView::Crosswise, 0, FluxBasis::Normalized1000Lm),
+        None
+    );
+    assert_eq!(
+        table
+            .rows(FluxBasis::Normalized1000Lm)
+            .next()
+            .expect("table has rooms")
+            .crosswise[0],
+        None
+    );
+}
+
+#[test]
 fn constants_follow_cie_190_order() {
     assert_eq!(UGR_ROOMS[0], UgrRoom { x_h: 2, y_h: 2 });
     assert_eq!(UGR_ROOMS[10], UgrRoom { x_h: 4, y_h: 8 });

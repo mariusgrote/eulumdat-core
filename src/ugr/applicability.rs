@@ -34,16 +34,19 @@ const ANGLE_TOLERANCE_DEG: f64 = 1e-6;
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum UgrBlocker {
-    /// The luminous area has no positive length or no positive bottom area,
-    /// so luminance is undefined.
+    /// A luminous-area dimension is negative or non-finite, or the bottom area
+    /// is not positive and finite, so luminance is undefined.
     NoLuminousArea,
-    /// There is no lamp set, or the first one has no positive flux.
+    /// There is no lamp set, or the first one has no positive finite flux.
     NoLampFlux,
-    /// The light output ratio is not positive, so the background luminance
-    /// is zero.
+    /// The light output ratio is not positive and finite, so the background
+    /// luminance is undefined.
     NoLightOutputRatio,
+    /// The intensity conversion factor is not positive and finite.
+    InvalidConversionFactor,
     /// The intensity matrix does not match the angles, the angles are not
-    /// ascending, or no intensity is positive.
+    /// finite, ascending, and in range, an intensity is negative or non-finite,
+    /// or no intensity is positive.
     InvalidDistribution,
     /// The stored gamma angles do not cover 0° to 90°.
     IncompleteDistribution {
@@ -77,18 +80,24 @@ pub enum UgrBlocker {
 impl Display for UgrBlocker {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NoLuminousArea => write!(f, "Luminous area = 0 -> luminance is undefined"),
+            Self::NoLuminousArea => write!(
+                f,
+                "Luminous-area dimensions -> must be non-negative and finite with positive area"
+            ),
             Self::NoLampFlux => write!(
                 f,
-                "Luminous flux of first lamp set = 0 or missing -> no light"
+                "First lamp set -> must exist with positive finite luminous flux"
             ),
-            Self::NoLightOutputRatio => write!(
+            Self::NoLightOutputRatio => {
+                write!(f, "Light output ratio -> must be positive and finite")
+            }
+            Self::InvalidConversionFactor => write!(
                 f,
-                "Light output ratio = 0 -> background luminance is undefined"
+                "Intensity conversion factor -> must be positive and finite"
             ),
             Self::InvalidDistribution => write!(
                 f,
-                "Luminous intensity distribution -> inconsistent or without light"
+                "Luminous intensity distribution -> must be finite, non-negative, and contain light"
             ),
             Self::IncompleteDistribution {
                 min_gamma: Some(min),
@@ -127,18 +136,21 @@ impl Eulumdat {
     /// Collects every reason why the UGR tabular method does not apply.
     pub(crate) fn ugr_blockers(&self) -> Vec<UgrBlocker> {
         let mut blockers = Vec::new();
-        if !is_positive(self.luminous_area_length) || !is_positive(self.projected_area(0.0, 0.0)) {
+        if !self.has_valid_luminous_geometry() {
             blockers.push(UgrBlocker::NoLuminousArea);
         }
         if !self
             .lamps
             .first()
-            .is_some_and(|lamps| is_positive(lamps.total_luminous_flux))
+            .is_some_and(|lamps| is_positive_finite(lamps.total_luminous_flux))
         {
             blockers.push(UgrBlocker::NoLampFlux);
         }
-        if !is_positive(self.light_output_ratio) {
+        if !is_positive_finite(self.light_output_ratio) {
             blockers.push(UgrBlocker::NoLightOutputRatio);
+        }
+        if !is_positive_finite(self.conversion_factor) {
+            blockers.push(UgrBlocker::InvalidConversionFactor);
         }
 
         let Some(peak) = self.valid_distribution_peak() else {
@@ -160,7 +172,12 @@ impl Eulumdat {
         if let Some(blocker) = self.coarse_grid() {
             blockers.push(blocker);
         }
-        let upward_fraction = 1.0 - self.calculated_downward_flux_fraction() / 100.0;
+        let downward_fraction = self.calculated_downward_flux_fraction();
+        if !downward_fraction.is_finite() {
+            blockers.push(UgrBlocker::InvalidDistribution);
+            return blockers;
+        }
+        let upward_fraction = 1.0 - downward_fraction / 100.0;
         if upward_fraction > MAX_UPWARD_FRACTION {
             blockers.push(UgrBlocker::IndirectShareTooHigh { upward_fraction });
         }
@@ -181,7 +198,9 @@ impl Eulumdat {
             &self.intensities,
         )
         .ok()?;
-        if !is_ascending(&self.c_planes) || !is_ascending(&self.gamma_angles) {
+        if !valid_angles(&self.c_planes, 360.0, false)
+            || !valid_angles(&self.gamma_angles, 180.0, true)
+        {
             return None;
         }
         let peak = self
@@ -190,9 +209,32 @@ impl Eulumdat {
             .flatten()
             .copied()
             .try_fold(0.0_f64, |peak, value| {
-                value.is_finite().then(|| peak.max(value))
+                (value.is_finite() && value >= 0.0).then(|| peak.max(value))
             })?;
-        is_positive(peak).then_some(peak)
+        is_positive_finite(peak).then_some(peak)
+    }
+
+    /// Whether every luminous-area value used by the UGR calculation has a
+    /// physically meaningful sign and finite value.
+    fn has_valid_luminous_geometry(&self) -> bool {
+        if !is_positive_finite(self.luminous_area_length)
+            || !is_non_negative_finite(self.luminous_area_width)
+            || !is_non_negative_finite(self.luminous_area_height_c0)
+        {
+            return false;
+        }
+        if self.luminous_area_width > 0.0
+            && ![
+                self.luminous_area_height_c90,
+                self.luminous_area_height_c180,
+                self.luminous_area_height_c270,
+            ]
+            .into_iter()
+            .all(is_non_negative_finite)
+        {
+            return false;
+        }
+        is_positive_finite(self.projected_area(0.0, 0.0))
     }
 
     /// `AngleGridTooCoarse` if a gamma or C gap exceeds its limit.
@@ -236,15 +278,27 @@ impl Eulumdat {
     }
 }
 
-/// `true` for positive numbers; `false` for zero, negative numbers, and NaN.
-fn is_positive(value: f64) -> bool {
-    value > 0.0
+/// `true` for positive finite numbers.
+fn is_positive_finite(value: f64) -> bool {
+    value.is_finite() && value > 0.0
 }
 
-fn is_ascending(values: &[f64]) -> bool {
-    values
-        .windows(2)
-        .all(|pair| pair[0].is_finite() && pair[0] < pair[1] && pair[1].is_finite())
+fn is_non_negative_finite(value: f64) -> bool {
+    value.is_finite() && value >= 0.0
+}
+
+/// Whether an angle axis is finite, in `[0, upper]` (or `[0, upper)`), and
+/// strictly ascending.
+fn valid_angles(values: &[f64], upper: f64, inclusive_upper: bool) -> bool {
+    values.iter().all(|&value| {
+        value.is_finite()
+            && value >= 0.0
+            && if inclusive_upper {
+                value <= upper
+            } else {
+                value < upper
+            }
+    }) && values.windows(2).all(|pair| pair[0] < pair[1])
 }
 
 /// Largest difference between neighbouring values; 0 for fewer than two.

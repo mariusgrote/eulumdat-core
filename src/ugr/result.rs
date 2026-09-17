@@ -59,7 +59,8 @@ pub enum FluxBasis {
 /// [`UGR_REFLECTANCES`]. Values are not rounded. A cell is `None` if no
 /// luminaire in the room contributes glare, for example with a beam too narrow
 /// to reach any observer position, or if the background luminance is not
-/// positive. The native values use [`FluxBasis::LampFlux`]; the conversion
+/// positive, or if the calculated UGR value is not finite. Every `Some` value
+/// is finite. The native values use [`FluxBasis::LampFlux`]; the conversion
 /// factor has already been applied to the stored cd/klm intensities used for
 /// glare-source luminance.
 #[derive(Debug, Clone, PartialEq)]
@@ -121,7 +122,7 @@ impl UgrTable {
             UgrView::Endwise => REFLECTANCE_COUNT,
         };
         let value = self.values.get(room)?[offset + reflectance]?;
-        Some(self.rebase(value, basis))
+        self.rebase(value, basis)
     }
 
     #[must_use]
@@ -140,7 +141,9 @@ impl UgrTable {
             .map(move |(&room, values)| {
                 let (crosswise, endwise) = values.split_at(REFLECTANCE_COUNT);
                 let rebase = |cells: &[Option<f64>]| {
-                    std::array::from_fn(|index| cells[index].map(|v| self.rebase(v, basis)))
+                    std::array::from_fn(|index| {
+                        cells[index].and_then(|value| self.rebase(value, basis))
+                    })
                 };
                 UgrRow {
                     room,
@@ -150,10 +153,11 @@ impl UgrTable {
             })
     }
 
-    fn rebase(&self, value: f64, basis: FluxBasis) -> f64 {
-        match basis {
+    fn rebase(&self, value: f64, basis: FluxBasis) -> Option<f64> {
+        let rebased = match basis {
             FluxBasis::LampFlux => value,
             FluxBasis::Normalized1000Lm => value - self.flux_correction(),
-        }
+        };
+        rebased.is_finite().then_some(rebased)
     }
 }

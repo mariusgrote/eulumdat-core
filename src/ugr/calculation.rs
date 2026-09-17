@@ -37,7 +37,8 @@ impl Eulumdat {
     /// without checking whether the tabular method applies.
     ///
     /// CIE 190:2010 publishes its validation example for S = 1.0·H. Cells are
-    /// `None` if no luminaire contributes or `L_b` is not positive.
+    /// `None` if no luminaire contributes, `L_b` is not positive, or the
+    /// calculated value is not finite.
     pub(crate) fn ugr_table_with_spacing(&self, spacing_to_height: f64) -> UgrTable {
         let lamp_flux = self
             .lamps
@@ -64,7 +65,10 @@ impl Eulumdat {
                 };
                 for (cell, luminance) in cells.iter_mut().zip(background) {
                     if luminance > 0.0 {
-                        *cell = Some(8.0 * (0.25 / luminance * glare_sum).log10());
+                        let value = 8.0 * (0.25 / luminance * glare_sum).log10();
+                        if value.is_finite() {
+                            *cell = Some(value);
+                        }
                     }
                 }
             }

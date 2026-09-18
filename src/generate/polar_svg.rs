@@ -25,6 +25,17 @@ pub struct PolarDiagramOptions {
     pub show_axis_labels: bool,
     /// How luminous intensity values are scaled before plotting.
     pub intensity_mode: IntensityMode,
+    /// Visual treatment and framing used for the diagram.
+    pub presentation: PolarDiagramPresentation,
+}
+
+/// Visual treatment used for a polar diagram.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PolarDiagramPresentation {
+    /// The original full-circle diagram, retained for reports and existing callers.
+    Classic,
+    /// A denser technical diagram that focuses downlights while preserving uplight.
+    Focused,
 }
 
 /// A pair of C-planes rendered as one signed polar curve.
@@ -83,6 +94,7 @@ impl Default for PolarDiagramOptions {
             show_legend: true,
             show_axis_labels: true,
             intensity_mode: IntensityMode::StoredCandelaPerKilolumen,
+            presentation: PolarDiagramPresentation::Classic,
         }
     }
 }
@@ -117,10 +129,27 @@ impl Eulumdat {
 
         let width = f64::from(options.width);
         let height = f64::from(options.height);
+        let focused = options.presentation == PolarDiagramPresentation::Focused;
+        let downlight_framing = focused && !has_meaningful_uplight(&curves, max_intensity);
         let center_x = width / 2.0;
-        let center_y = height / 2.0 + if options.title.is_some() { 20.0 } else { 0.0 };
-        let radius = ((width.min(height) / 2.0) - options.margin).max(1.0);
-        let scale_max = nice_ceiling(max_intensity);
+        let classic_center_y = height / 2.0 + if options.title.is_some() { 20.0 } else { 0.0 };
+        let center_y = if downlight_framing {
+            (height * 0.2)
+                .max(options.margin + 12.0)
+                .min(height - options.margin - 1.0)
+        } else {
+            classic_center_y
+        };
+        let radius = if downlight_framing {
+            (height - center_y - options.margin).max(1.0)
+        } else {
+            ((width.min(height) / 2.0) - options.margin).max(1.0)
+        };
+        let (scale_max, tick_step) = if focused {
+            focused_scale(max_intensity)
+        } else {
+            (nice_ceiling(max_intensity), 0.0)
+        };
         let colors = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#ff7f0e"];
 
         let mut doc = Document::new()
@@ -128,7 +157,19 @@ impl Eulumdat {
             .set("viewBox", (0, 0, options.width, options.height))
             .set("width", options.width)
             .set("height", options.height)
-            .set("role", "img");
+            .set("role", "img")
+            .set(
+                "data-polar-presentation",
+                if focused { "focused" } else { "classic" },
+            )
+            .set(
+                "data-polar-framing",
+                if downlight_framing {
+                    "downlight"
+                } else {
+                    "full"
+                },
+            );
         doc = doc.add(
             Rectangle::new()
                 .set("x", 0)
@@ -156,66 +197,129 @@ impl Eulumdat {
             .set("stroke", "#d8d8d8")
             .set("stroke-width", 1)
             .set("fill", "none");
-        if options.show_grid {
-            for i in 1..=4 {
-                let r = radius * f64::from(i) / 4.0;
+        if focused {
+            if options.show_grid {
+                let mut value = tick_step;
+                while value <= scale_max + tick_step * 1e-9 {
+                    grid = grid.add(
+                        Circle::new()
+                            .set("cx", center_x)
+                            .set("cy", center_y)
+                            .set("r", radius * value / scale_max),
+                    );
+                    value += tick_step;
+                }
+            }
+            let inset = options.margin.min(width.min(height) / 4.0) * 0.35;
+            for angle in (-180..180).step_by(15) {
+                let (x, y) = ray_to_bounds(
+                    center_x,
+                    center_y,
+                    f64::from(angle),
+                    inset,
+                    inset,
+                    width - inset,
+                    height - inset,
+                );
                 grid = grid.add(
-                    Circle::new()
-                        .set("cx", center_x)
-                        .set("cy", center_y)
-                        .set("r", r),
+                    Line::new()
+                        .set("x1", center_x)
+                        .set("y1", center_y)
+                        .set("x2", x)
+                        .set("y2", y),
                 );
             }
-        }
-        for angle in [0.0_f64, 45.0, 90.0, 135.0, 180.0, -45.0, -90.0, -135.0] {
-            let (x, y) = polar_point(center_x, center_y, radius, angle);
-            grid = grid.add(
-                Line::new()
-                    .set("x1", center_x)
-                    .set("y1", center_y)
-                    .set("x2", x)
-                    .set("y2", y),
-            );
+        } else {
+            if options.show_grid {
+                for i in 1..=4 {
+                    let r = radius * f64::from(i) / 4.0;
+                    grid = grid.add(
+                        Circle::new()
+                            .set("cx", center_x)
+                            .set("cy", center_y)
+                            .set("r", r),
+                    );
+                }
+            }
+            for angle in [0.0_f64, 45.0, 90.0, 135.0, 180.0, -45.0, -90.0, -135.0] {
+                let (x, y) = polar_point(center_x, center_y, radius, angle);
+                grid = grid.add(
+                    Line::new()
+                        .set("x1", center_x)
+                        .set("y1", center_y)
+                        .set("x2", x)
+                        .set("y2", y),
+                );
+            }
         }
         doc = doc.add(grid);
 
         if options.show_axis_labels {
-            doc = add_axis_labels(doc, center_x, center_y, radius);
-            for i in 1..=4 {
-                let value = scale_max * f64::from(i) / 4.0;
-                doc = doc.add(
-                    Text::new(format_number(value))
-                        .set("x", center_x + 5.0)
-                        .set("y", center_y - radius * f64::from(i) / 4.0 - 4.0)
-                        .set("font-family", "Arial, Helvetica, sans-serif")
-                        .set("font-size", 12)
-                        .set("fill", "#666666"),
+            if focused {
+                doc = add_focused_axis_labels(
+                    doc,
+                    center_x,
+                    center_y,
+                    radius,
+                    width,
+                    height,
+                    options.margin,
+                    scale_max,
+                    tick_step,
+                    downlight_framing,
                 );
+            } else {
+                doc = add_axis_labels(doc, center_x, center_y, radius);
+                for i in 1..=4 {
+                    let value = scale_max * f64::from(i) / 4.0;
+                    doc = doc.add(
+                        Text::new(format_number(value))
+                            .set("x", center_x + 5.0)
+                            .set("y", center_y - radius * f64::from(i) / 4.0 - 4.0)
+                            .set("font-family", "Arial, Helvetica, sans-serif")
+                            .set("font-size", 12)
+                            .set("fill", "#666666"),
+                    );
+                }
             }
         }
 
+        let mut fill_group = Group::new().set("id", "polar-fills");
         let mut curve_group = Group::new().set("id", "polar-curves").set("fill", "none");
         for (index, curve) in curves.iter().enumerate() {
-            let color = colors[index % colors.len()];
-            let mut data = Data::new();
-            for (point_index, (theta, value)) in curve.values.iter().enumerate() {
-                let r = radius * (value / scale_max).clamp(0.0, 1.0);
-                let (x, y) = polar_point(center_x, center_y, r, *theta);
-                data = if point_index == 0 {
-                    data.move_to((x, y))
-                } else {
-                    data.line_to((x, y))
-                };
+            let color = if focused {
+                focused_color(curve, index)
+            } else {
+                colors[index % colors.len()]
+            };
+            if focused {
+                fill_group = fill_group.add(
+                    SvgPath::new()
+                        .set(
+                            "d",
+                            curve_data(curve, center_x, center_y, radius, scale_max).close(),
+                        )
+                        .set("fill", "#fff28a")
+                        .set("fill-opacity", 0.3)
+                        .set("stroke", "none")
+                        .set("data-plane-pair", curve.label.as_str()),
+                );
             }
             curve_group = curve_group.add(
                 SvgPath::new()
-                    .set("d", data)
+                    .set(
+                        "d",
+                        curve_data(curve, center_x, center_y, radius, scale_max),
+                    )
                     .set("stroke", color)
-                    .set("stroke-width", 2.5)
+                    .set("stroke-width", if focused { 2.0 } else { 2.5 })
                     .set("stroke-linejoin", "round")
                     .set("stroke-linecap", "round")
                     .set("data-plane-pair", curve.label.as_str()),
             );
+        }
+        if focused {
+            doc = doc.add(fill_group);
         }
         doc = doc.add(curve_group);
 
@@ -225,6 +329,7 @@ impl Eulumdat {
                 &curves,
                 &notes,
                 colors,
+                focused,
                 width - options.margin - 170.0,
                 68.0,
             );
@@ -318,6 +423,7 @@ fn add_legend(
     curves: &[Curve],
     notes: &[String],
     colors: [&str; 5],
+    focused: bool,
     x: f64,
     y: f64,
 ) -> Document {
@@ -334,7 +440,14 @@ fn add_legend(
                     .set("y1", row_y - 4.0)
                     .set("x2", x + 28.0)
                     .set("y2", row_y - 4.0)
-                    .set("stroke", colors[index % colors.len()])
+                    .set(
+                        "stroke",
+                        if focused {
+                            focused_color(curve, index)
+                        } else {
+                            colors[index % colors.len()]
+                        },
+                    )
                     .set("stroke-width", 3),
             )
             .add(
@@ -355,6 +468,168 @@ fn add_legend(
     }
     doc = doc.add(legend);
     doc
+}
+
+fn curve_data(curve: &Curve, center_x: f64, center_y: f64, radius: f64, scale_max: f64) -> Data {
+    let mut data = Data::new();
+    for (point_index, (theta, value)) in curve.values.iter().enumerate() {
+        let r = radius * (value / scale_max).clamp(0.0, 1.0);
+        let (x, y) = polar_point(center_x, center_y, r, *theta);
+        data = if point_index == 0 {
+            data.move_to((x, y))
+        } else {
+            data.line_to((x, y))
+        };
+    }
+    data
+}
+
+fn has_meaningful_uplight(curves: &[Curve], max_intensity: f64) -> bool {
+    let threshold = max_intensity * 0.01;
+    curves.iter().any(|curve| {
+        curve
+            .values
+            .iter()
+            .any(|(theta, value)| theta.abs() > 90.0 && *value > threshold)
+    })
+}
+
+fn focused_color(curve: &Curve, index: usize) -> &'static str {
+    if curve.label == "C0-C180" {
+        "#ff6b6b"
+    } else if curve.label == "C90-C270" {
+        "#7375ff"
+    } else if curve.label == "C45-C225" {
+        "#2f9e62"
+    } else if curve.label == "C135-C315" {
+        "#e89032"
+    } else {
+        ["#8f63c7", "#2c9aa0", "#b56a9b"][index % 3]
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn add_focused_axis_labels(
+    mut doc: Document,
+    center_x: f64,
+    center_y: f64,
+    radius: f64,
+    width: f64,
+    height: f64,
+    margin: f64,
+    scale_max: f64,
+    tick_step: f64,
+    downlight_framing: bool,
+) -> Document {
+    let inset = margin.min(width.min(height) / 4.0) * 0.35;
+    let label_step = if width.min(height) >= 720.0 { 15 } else { 30 };
+    let max_angle = if downlight_framing { 90 } else { 180 };
+    for gamma in (0..=max_angle).step_by(label_step) {
+        for signed_gamma in if gamma == 0 || gamma == 180 {
+            vec![f64::from(gamma)]
+        } else {
+            vec![-f64::from(gamma), f64::from(gamma)]
+        } {
+            let (edge_x, edge_y) = ray_to_bounds(
+                center_x,
+                center_y,
+                signed_gamma,
+                inset,
+                inset,
+                width - inset,
+                height - inset,
+            );
+            let dx = center_x - edge_x;
+            let dy = center_y - edge_y;
+            let distance = dx.hypot(dy).max(1.0);
+            doc = doc.add(
+                Text::new(format!("{gamma}°"))
+                    .set("x", edge_x + dx / distance * 10.0)
+                    .set("y", edge_y + dy / distance * 10.0)
+                    .set("font-family", "Arial, Helvetica, sans-serif")
+                    .set("font-size", 12)
+                    .set("text-anchor", "middle")
+                    .set("dominant-baseline", "central")
+                    .set("fill", "#555555"),
+            );
+        }
+    }
+
+    let mut value = tick_step;
+    while value <= scale_max + tick_step * 1e-9 {
+        let y = center_y + radius * value / scale_max;
+        if y < height - inset - 18.0 {
+            doc = doc.add(
+                Text::new(format_number(value))
+                    .set("x", center_x + 6.0)
+                    .set("y", y - 4.0)
+                    .set("font-family", "Arial, Helvetica, sans-serif")
+                    .set("font-size", 12)
+                    .set("fill", "#555555"),
+            );
+        }
+        value += tick_step;
+    }
+
+    doc.add(
+        Text::new("cd/klm")
+            .set("x", inset + 4.0)
+            .set("y", height - inset - 4.0)
+            .set("font-family", "Arial, Helvetica, sans-serif")
+            .set("font-size", 12)
+            .set("fill", "#555555"),
+    )
+}
+
+fn ray_to_bounds(
+    center_x: f64,
+    center_y: f64,
+    theta: f64,
+    left: f64,
+    top: f64,
+    right: f64,
+    bottom: f64,
+) -> (f64, f64) {
+    let radians = theta.to_radians();
+    let dx = radians.sin();
+    let dy = radians.cos();
+    let tx = if dx > 1e-9 {
+        (right - center_x) / dx
+    } else if dx < -1e-9 {
+        (left - center_x) / dx
+    } else {
+        f64::INFINITY
+    };
+    let ty = if dy > 1e-9 {
+        (bottom - center_y) / dy
+    } else if dy < -1e-9 {
+        (top - center_y) / dy
+    } else {
+        f64::INFINITY
+    };
+    let distance = tx.min(ty);
+    (center_x + dx * distance, center_y + dy * distance)
+}
+
+fn focused_scale(max_intensity: f64) -> (f64, f64) {
+    let raw_step = max_intensity / 5.0;
+    let exponent = raw_step.log10().floor();
+    let base = 10.0_f64.powf(exponent);
+    let normalized = raw_step / base;
+    let nice = if normalized < 1.5 {
+        1.0
+    } else if normalized < 2.25 {
+        2.0
+    } else if normalized < 3.75 {
+        2.5
+    } else if normalized < 7.5 {
+        5.0
+    } else {
+        10.0
+    };
+    let step = nice * base;
+    let scale_max = (max_intensity / step).ceil() * step;
+    (scale_max, step)
 }
 
 fn polar_point(center_x: f64, center_y: f64, radius: f64, theta: f64) -> (f64, f64) {

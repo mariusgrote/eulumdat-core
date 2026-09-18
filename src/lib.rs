@@ -103,8 +103,8 @@ pub use crate::encoding::TextEncoding;
 pub use crate::error::{EulumdatError, ParseContext, ValidationWarning};
 #[cfg(feature = "generate-svg")]
 pub use crate::generate::{
-    IntensityMode, PlanePair, PolarDiagramOptions, RasterBackground, RasterOptions, ReportOptions,
-    ReportPageSize,
+    IntensityMode, PlanePair, PolarDiagramOptions, PolarDiagramPresentation, RasterBackground,
+    RasterOptions, ReportOptions, ReportPageSize,
 };
 pub use crate::model::{
     Distribution, Eulumdat, LampSet, Symmetry, TypeIndicator, ValidationSettings,

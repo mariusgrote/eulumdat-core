@@ -150,6 +150,19 @@ impl Eulumdat {
         } else {
             (nice_ceiling(max_intensity), 0.0)
         };
+        let focused_font_size = focused_label_font_size(width, height);
+        let footer_height = if focused {
+            focused_footer_height(
+                width,
+                height,
+                curves.len(),
+                options.show_axis_labels,
+                options.show_legend,
+            )
+        } else {
+            0.0
+        };
+        let plot_bottom = height - footer_height;
         let colors = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#ff7f0e"];
 
         let mut doc = Document::new()
@@ -219,7 +232,7 @@ impl Eulumdat {
                     inset,
                     inset,
                     width - inset,
-                    height - inset,
+                    plot_bottom,
                 );
                 grid = grid.add(
                     Line::new()
@@ -267,6 +280,8 @@ impl Eulumdat {
                     scale_max,
                     tick_step,
                     downlight_framing,
+                    plot_bottom,
+                    focused_font_size,
                 );
             } else {
                 doc = add_axis_labels(doc, center_x, center_y, radius);
@@ -323,7 +338,18 @@ impl Eulumdat {
         }
         doc = doc.add(curve_group);
 
-        if options.show_legend {
+        if focused && (options.show_axis_labels || options.show_legend) {
+            doc = add_focused_footer(
+                doc,
+                &curves,
+                width,
+                height,
+                footer_height,
+                focused_font_size,
+                options.show_axis_labels,
+                options.show_legend,
+            );
+        } else if options.show_legend {
             doc = add_legend(
                 doc,
                 &curves,
@@ -520,6 +546,8 @@ fn add_focused_axis_labels(
     scale_max: f64,
     tick_step: f64,
     downlight_framing: bool,
+    plot_bottom: f64,
+    font_size: u32,
 ) -> Document {
     let inset = margin.min(width.min(height) / 4.0) * 0.35;
     let label_step = if width.min(height) >= 720.0 { 15 } else { 30 };
@@ -537,7 +565,7 @@ fn add_focused_axis_labels(
                 inset,
                 inset,
                 width - inset,
-                height - inset,
+                plot_bottom,
             );
             let dx = center_x - edge_x;
             let dy = center_y - edge_y;
@@ -547,7 +575,7 @@ fn add_focused_axis_labels(
                     .set("x", edge_x + dx / distance * 10.0)
                     .set("y", edge_y + dy / distance * 10.0)
                     .set("font-family", "Arial, Helvetica, sans-serif")
-                    .set("font-size", 12)
+                    .set("font-size", font_size)
                     .set("text-anchor", "middle")
                     .set("dominant-baseline", "central")
                     .set("fill", "#555555"),
@@ -558,27 +586,113 @@ fn add_focused_axis_labels(
     let mut value = tick_step;
     while value <= scale_max + tick_step * 1e-9 {
         let y = center_y + radius * value / scale_max;
-        if y < height - inset - 18.0 {
+        if y <= plot_bottom {
             doc = doc.add(
                 Text::new(format_number(value))
                     .set("x", center_x + 6.0)
                     .set("y", y - 4.0)
                     .set("font-family", "Arial, Helvetica, sans-serif")
-                    .set("font-size", 12)
+                    .set("font-size", font_size)
                     .set("fill", "#555555"),
             );
         }
         value += tick_step;
     }
 
-    doc.add(
-        Text::new("cd/klm")
-            .set("x", inset + 4.0)
-            .set("y", height - inset - 4.0)
-            .set("font-family", "Arial, Helvetica, sans-serif")
-            .set("font-size", 12)
-            .set("fill", "#555555"),
-    )
+    doc
+}
+
+#[allow(clippy::too_many_arguments)]
+fn add_focused_footer(
+    mut doc: Document,
+    curves: &[Curve],
+    width: f64,
+    height: f64,
+    footer_height: f64,
+    font_size: u32,
+    show_units: bool,
+    show_legend: bool,
+) -> Document {
+    let footer_top = height - footer_height;
+    let row_height = f64::from(font_size) + 8.0;
+    if show_units {
+        doc = doc.add(
+            Text::new("cd/klm")
+                .set("x", 6.0)
+                .set("y", footer_top + row_height)
+                .set("font-family", "Arial, Helvetica, sans-serif")
+                .set("font-size", font_size)
+                .set("fill", "#444444"),
+        );
+    }
+    if !show_legend {
+        return doc;
+    }
+
+    let columns = if width >= 720.0 {
+        curves.len().max(1)
+    } else {
+        curves.len().clamp(1, 2)
+    };
+    let item_width = if width >= 720.0 { 142.0 } else { 112.0 };
+    let legend_width = item_width * columns as f64;
+    let start_x = ((width - legend_width) / 2.0).max(72.0);
+    let legend = curves.iter().enumerate().fold(
+        Group::new().set("id", "polar-footer-legend"),
+        |legend, (index, curve)| {
+            let column = index % columns;
+            let row = index / columns;
+            let x = start_x + column as f64 * item_width;
+            let y = footer_top + row_height * (row as f64 + 1.0);
+            legend
+                .add(
+                    Line::new()
+                        .set("x1", x)
+                        .set("y1", y - 5.0)
+                        .set("x2", x + 24.0)
+                        .set("y2", y - 5.0)
+                        .set("stroke", focused_color(curve, index))
+                        .set("stroke-width", 3),
+                )
+                .add(
+                    Text::new(curve.label.replace('-', "/"))
+                        .set("x", x + 32.0)
+                        .set("y", y)
+                        .set("font-family", "Arial, Helvetica, sans-serif")
+                        .set("font-size", font_size)
+                        .set("fill", "#333333"),
+                )
+        },
+    );
+    doc.add(legend)
+}
+
+fn focused_label_font_size(width: f64, height: f64) -> u32 {
+    if width.min(height) >= 720.0 { 16 } else { 14 }
+}
+
+fn focused_footer_height(
+    width: f64,
+    height: f64,
+    curve_count: usize,
+    show_units: bool,
+    show_legend: bool,
+) -> f64 {
+    if !show_units && !show_legend {
+        return 0.0;
+    }
+    let font_size = f64::from(focused_label_font_size(width, height));
+    let columns = if width >= 720.0 {
+        curve_count.max(1)
+    } else {
+        curve_count.clamp(1, 2)
+    };
+    let rows = if show_legend {
+        curve_count.max(1).div_ceil(columns)
+    } else {
+        1
+    };
+    8.0 + rows as f64 * (font_size + 8.0)
 }
 
 fn ray_to_bounds(

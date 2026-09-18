@@ -50,7 +50,10 @@ fn focused_presentation_crops_downlights_and_fills_each_curve() {
     assert!(svg.contains("stroke=\"#7375ff\""));
     assert!(svg.contains("30°"));
     assert!(!svg.contains("15°"));
+    assert!(svg.contains("font-size=\"14\""));
     assert!(svg.contains("cd/klm"));
+    assert!(svg.contains("id=\"polar-footer-legend\""));
+    assert!(svg.contains("C0/C180"));
 }
 
 #[test]
@@ -69,6 +72,7 @@ fn focused_presentation_shows_fifteen_degree_labels_when_large() {
 
     assert!(svg.contains("15°"));
     assert!(svg.contains("75°"));
+    assert!(svg.contains("font-size=\"16\""));
 }
 
 #[test]

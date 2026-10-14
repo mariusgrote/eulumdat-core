@@ -136,13 +136,8 @@ impl Eulumdat {
         for index in 0..lamp_count {
             let prefix = format!("lamp[{index}].");
             let lamp_count_raw = reader.parse_i64(&(prefix.clone() + "number of lamps"))?;
-            if lamp_count_raw < 0 {
-                return Err(EulumdatError::Validation(format!(
-                    "Number of lamps = {lamp_count_raw} -> value is out of range"
-                )));
-            }
             loaded.lamps.push(LampSet {
-                lamp_count: u32::try_from(lamp_count_raw).map_err(|_| {
+                lamp_count: i32::try_from(lamp_count_raw).map_err(|_| {
                     EulumdatError::Validation(format!(
                         "Number of lamps = {lamp_count_raw} -> value is out of range"
                     ))

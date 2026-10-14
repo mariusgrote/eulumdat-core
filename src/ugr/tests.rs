@@ -315,3 +315,20 @@ fn out_of_range_or_missing_data_yields_none() {
 
     assert_eq!(Eulumdat::default().intensity_at(0.0, 0.0), None);
 }
+
+#[test]
+fn absolute_emitter_count_does_not_scale_operating_luminance() {
+    let mut model = linear_model();
+    model.lamps[0].lamp_count = -1;
+    model.lamps[0].total_luminous_flux = 2500.0;
+    let gamma = 0.0;
+    let expected = 90.0 * 2.5 / model.projected_area(90.0, gamma);
+    assert!((model.luminance_at(90.0, gamma).unwrap() - expected).abs() < 1e-8);
+    let baseline = model.luminance_at(90.0, gamma).unwrap();
+    for count in [-42, 42, 1] {
+        model.lamps[0].lamp_count = count;
+        assert_eq!(model.luminance_at(90.0, gamma), Some(baseline));
+    }
+    model.lamps[0].total_luminous_flux *= 2.0;
+    assert_eq!(model.luminance_at(90.0, gamma), Some(baseline * 2.0));
+}

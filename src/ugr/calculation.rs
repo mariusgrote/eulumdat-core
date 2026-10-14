@@ -55,7 +55,7 @@ impl Eulumdat {
             let background = fractions.background_luminance(room_index, wall_flux_density);
 
             let (view_cells, remainder) = row.as_chunks_mut::<REFLECTANCE_COUNT>();
-            debug_assert!(remainder.is_empty());
+            debug_assert_eq!(remainder, []);
             for (view, cells) in [UgrView::Crosswise, UgrView::Endwise]
                 .into_iter()
                 .zip(view_cells)

@@ -49,6 +49,12 @@ impl Eulumdat {
             ));
         }
 
+        if self.is_absolute_photometry() && self.lamps.len() != 1 {
+            return validation_error(
+                "Absolute photometry requires exactly one standard set of lamps".to_string(),
+            );
+        }
+
         warn_len(
             &mut warnings,
             "Identification",
@@ -179,12 +185,18 @@ impl Eulumdat {
         );
 
         for (lamp_index, lamp) in self.lamps.iter().enumerate() {
+            if lamp.lamp_count < -1000 {
+                return validation_error(format!(
+                    "Number of lamps = {} -> absolute emitter count is out of range (1..=1000)",
+                    lamp.lamp_count
+                ));
+            }
             // All checks in this loop body push document-level warnings (lamp_index
             // = None). Record where this set's warnings start so we can stamp them
             // with their lamp index afterwards, keeping the helpers index-agnostic.
             let lamp_warnings_start = warnings.len();
 
-            if !(1..=1000).contains(&lamp.lamp_count) {
+            if !(1..=1000).contains(&lamp.lamp_count.unsigned_abs()) {
                 warnings.push(warning(
                     "Number of lamps",
                     format!(
@@ -201,7 +213,11 @@ impl Eulumdat {
             );
             warn_range(
                 &mut warnings,
-                "Total luminous flux of lamps",
+                if lamp.lamp_count < 0 {
+                    "Luminous flux of luminaire"
+                } else {
+                    "Total luminous flux of lamps"
+                },
                 lamp.total_luminous_flux,
                 1.0,
                 9_999_999.0,

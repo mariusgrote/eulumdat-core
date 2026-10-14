@@ -77,11 +77,11 @@ pub struct Eulumdat {
 #[derive(Debug, Clone, PartialEq)]
 /// One standard set of lamps described by an EULUMDAT file.
 pub struct LampSet {
-    /// Number of lamps in the set.
-    pub lamp_count: u32,
+    /// Number of lamps, or negative emitter count for absolute photometry.
+    pub lamp_count: i32,
     /// Lamp type description.
     pub lamp_type: String,
-    /// Total luminous flux of the lamps in lumens.
+    /// Total lamp flux in lumens, or luminaire flux for absolute photometry.
     pub total_luminous_flux: f64,
     /// Lamp color temperature description.
     pub color_temperature: String,
@@ -198,6 +198,13 @@ impl Default for Eulumdat {
 }
 
 impl Eulumdat {
+    /// Returns whether any lamp set carries the absolute-photometry marker.
+    /// Validation requires absolute data to contain exactly one lamp set.
+    #[must_use]
+    pub fn is_absolute_photometry(&self) -> bool {
+        self.lamps.iter().any(|lamp| lamp.lamp_count < 0)
+    }
+
     #[must_use]
     /// Returns the number of expanded C-plane angles.
     pub fn c_plane_count(&self) -> usize {

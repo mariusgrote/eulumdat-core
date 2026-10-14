@@ -211,12 +211,25 @@ impl Eulumdat {
         }
 
         y += 14.0;
-        doc = add_section(doc, "Lamps", 40.0, y);
+        doc = add_section(
+            doc,
+            if self.is_absolute_photometry() {
+                "Absolute photometry (luminaire flux)"
+            } else {
+                "Lamps"
+            },
+            40.0,
+            y,
+        );
         y += 20.0;
         for lamp in &self.lamps {
             let value = format!(
                 "{} x {}, {} lm, {}, CRI {}, {} W",
-                lamp.lamp_count,
+                if lamp.lamp_count < 0 {
+                    format!("{} emitters (absolute)", lamp.lamp_count.unsigned_abs())
+                } else {
+                    lamp.lamp_count.to_string()
+                },
                 fallback(&lamp.lamp_type),
                 format_number(lamp.total_luminous_flux),
                 fallback(&lamp.color_temperature),
